@@ -14,9 +14,13 @@ importScripts("https://cdn.jsdelivr.net/gh/Destroyed12121/Staticsj@main/JS/scram
 importScripts("https://cdn.jsdelivr.net/npm/@mercuryworkshop/bare-mux/dist/index.js");
 
 const { ScramjetServiceWorker } = $scramjetLoadWorker();
+<<<<<<< HEAD
 const scramjet = new ScramjetServiceWorker({
     prefix: basePath + "scramjet/"
 });
+=======
+const scramjet = new ScramjetServiceWorker();
+>>>>>>> 14b20ffbaa6fdb08b045005865852cd23f586846
 
 self.addEventListener('install', (e) => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
@@ -38,7 +42,10 @@ const configReadyPromise = new Promise(resolve => resolveConfigReady = resolve);
 self.addEventListener("message", ({ data }) => {
     if (data.type === "config" && data.wispurl) {
         wispConfig.wispurl = data.wispurl;
+<<<<<<< HEAD
         console.log("SW: Received config", wispConfig);
+=======
+>>>>>>> 14b20ffbaa6fdb08b045005865852cd23f586846
         if (resolveConfigReady) {
             resolveConfigReady();
             resolveConfigReady = null;
@@ -46,6 +53,7 @@ self.addEventListener("message", ({ data }) => {
     }
 });
 
+<<<<<<< HEAD
 // Fallback if config is never received (prevents 500 error)
 setTimeout(() => {
     if (!wispConfig.wispurl && resolveConfigReady) {
@@ -56,12 +64,15 @@ setTimeout(() => {
     }
 }, 1000);
 
+=======
+>>>>>>> 14b20ffbaa6fdb08b045005865852cd23f586846
 scramjet.addEventListener("request", async (e) => {
     e.response = (async () => {
         if (!scramjet.client) {
             await configReadyPromise;
             if (!wispConfig.wispurl) return new Response("WISP URL missing", { status: 500 });
 
+<<<<<<< HEAD
             const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
             await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispConfig.wispurl }]);
             scramjet.client = connection;
@@ -98,5 +109,21 @@ scramjet.addEventListener("request", async (e) => {
 
         console.error("Scramjet Final Fetch Error:", lastErr);
         return new Response("Scramjet Fetch Error: " + lastErr.message, { status: 502 });
+=======
+            const connection = new BareMux.BareMuxConnection("/bareworker.js");
+            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: wispConfig.wispurl }]);
+            scramjet.client = connection;
+        }
+        return await scramjet.client.fetch(e.url, {
+            method: e.method,
+            body: e.body,
+            headers: e.requestHeaders,
+            credentials: "omit",
+            mode: e.mode === "cors" ? e.mode : "same-origin",
+            cache: e.cache,
+            redirect: "manual",
+            duplex: "half",
+        });
+>>>>>>> 14b20ffbaa6fdb08b045005865852cd23f586846
     })();
 });
