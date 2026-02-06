@@ -1,4 +1,5 @@
 
+const DEFAULT_WISP = "wss://dash.goip.de/wisp/";
 const swPath = self.location.pathname;
 const basePath = swPath.substring(0, swPath.lastIndexOf('/') + 1);
 self.basePath = self.basePath || basePath;
@@ -23,7 +24,11 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
-        await scramjet.loadConfig();
+        try {
+            await scramjet.loadConfig();
+        } catch (error) {
+            console.warn("SW: Failed to load scramjet config.", error);
+        }
         if (scramjet.route(event)) {
             return scramjet.fetch(event);
         }
@@ -50,7 +55,7 @@ self.addEventListener("message", ({ data }) => {
 setTimeout(() => {
     if (!wispConfig.wispurl && resolveConfigReady) {
         console.warn("SW: Config timeout, using default Wisp");
-        wispConfig.wispurl = "wss://dash.goip.de/wisp/";
+        wispConfig.wispurl = DEFAULT_WISP;
         resolveConfigReady();
         resolveConfigReady = null;
     }
@@ -67,6 +72,7 @@ scramjet.addEventListener("request", async (e) => {
             scramjet.client = connection;
         }
         const MAX_RETRIES = 2;
+        const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
         let lastErr;
 
         for (let i = 0; i <= MAX_RETRIES; i++) {
@@ -84,10 +90,7 @@ scramjet.addEventListener("request", async (e) => {
             } catch (err) {
                 lastErr = err;
                 const errMsg = err.message.toLowerCase();
-                const isRetryable = errMsg.includes("connect") ||
-                    errMsg.includes("eof") ||
-                    errMsg.includes("handshake") ||
-                    errMsg.includes("reset");
+                const isRetryable = RETRYABLE_ERRORS.some((message) => errMsg.includes(message));
 
                 if (!isRetryable || i === MAX_RETRIES || e.method !== 'GET') break;
 
