@@ -7,6 +7,12 @@ const WISP_SERVERS = [
     { name: "Space's Wisp", url: "wss://register.goip.it/wisp/" },
     { name: "Rhw's Wisp", url: "wss://wisp.rhw.one/wisp/" }
 ];
+const SEARCH_URL = "https://search.brave.com/search?q=";
+const INTERNAL_PROTOCOL = "lcc://";
+const INTERNAL_PAGES = {
+    settings: "settings",
+    newtab: "newtab"
+};
 
 if (!localStorage.getItem("proxServer")) {
     localStorage.setItem("proxServer", DEFAULT_WISP);
@@ -41,33 +47,38 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     });
 
-    await scramjet.init();
+    try {
+        await scramjet.init();
 
-    if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.register(basePath + 'sw.js', { scope: basePath });
-        await navigator.serviceWorker.ready;
-        const wispUrl = localStorage.getItem("proxServer") || DEFAULT_WISP;
+        if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.register(basePath + 'sw.js', { scope: basePath });
+            await navigator.serviceWorker.ready;
+            const wispUrl = localStorage.getItem("proxServer") || DEFAULT_WISP;
 
-        // Try to send to both active registration and controller to be safe
-        const sw = reg.active || navigator.serviceWorker.controller;
-        if (sw) {
-            console.log("Sending config to SW:", wispUrl);
-            sw.postMessage({ type: "config", wispurl: wispUrl });
+            // Try to send to both active registration and controller to be safe
+            const sw = reg.active || navigator.serviceWorker.controller;
+            if (sw) {
+                console.log("Sending config to SW:", wispUrl);
+                sw.postMessage({ type: "config", wispurl: wispUrl });
+            }
+
+            // Ensure controller also gets it if different
+            if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== sw) {
+                navigator.serviceWorker.controller.postMessage({ type: "config", wispurl: wispUrl });
+            }
+
+            // Force update to get new SW code if available
+            reg.update();
+
+            const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
+            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispUrl }]);
         }
 
-        // Ensure controller also gets it if different
-        if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== sw) {
-            navigator.serviceWorker.controller.postMessage({ type: "config", wispurl: wispUrl });
-        }
-
-        // Force update to get new SW code if available
-        reg.update();
-
-        const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-        await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispUrl }]);
+        await initializeBrowser();
+    } catch (error) {
+        console.error("Failed to initialize proxy UI:", error);
+        showErrorMessage("Failed to initialize proxy. Please reload or try another Wisp server.");
     }
-
-    await initializeBrowser();
 });
 
 // =====================================================
@@ -75,19 +86,40 @@ document.addEventListener('DOMContentLoaded', async function () {
 // =====================================================
 async function initializeBrowser() {
     const root = document.getElementById("app");
+    if (!root) {
+        console.error("App container missing.");
+        return;
+    }
     root.innerHTML = `
-        <div class="browser-container">
-            <div class="flex tabs" id="tabs-container"></div>
-            <div class="flex nav">
-                <button id="back-btn" title="Back"><i class="fa-solid fa-chevron-left"></i></button>
-                <button id="fwd-btn" title="Forward"><i class="fa-solid fa-chevron-right"></i></button>
-                <button id="reload-btn" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
-                <div class="address-wrapper">
-                    <input class="bar" id="address-bar" autocomplete="off" placeholder="Search or enter URL">
+        <div class="browser-container chrome-ui">
+            <div class="tab-strip">
+                <div class="tab-strip-left">
+                    <div class="tabs" id="tabs-container"></div>
+                    <button class="tab-action" id="new-tab-btn" title="New Tab">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="nav-controls">
+                    <button id="back-btn" title="Back"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="fwd-btn" title="Forward"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button id="reload-btn" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
                     <button id="home-btn-nav" title="Home"><i class="fa-solid fa-house"></i></button>
                 </div>
-                <button id="devtools-btn" title="DevTools"><i class="fa-solid fa-code"></i></button>
-                <button id="wisp-settings-btn" title="Proxy Settings"><i class="fa-solid fa-gear"></i></button>
+                <div class="address-wrapper">
+                    <div class="security-indicator" id="security-indicator">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <input class="bar" id="address-bar" autocomplete="off" placeholder="Search Google or type a URL">
+                    <div class="omnibox-actions">
+                        <button class="omnibox-btn" id="theme-toggle" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
+                    </div>
+                </div>
+                <div class="toolbar-actions">
+                    <button id="devtools-btn" title="DevTools"><i class="fa-solid fa-code"></i></button>
+                    <button id="wisp-settings-btn" title="Proxy Settings"><i class="fa-solid fa-gear"></i></button>
+                </div>
             </div>
             <div class="loading-bar-container"><div class="loading-bar" id="loading-bar"></div></div>
             <div class="iframe-container" id="iframe-container">
@@ -114,6 +146,8 @@ async function initializeBrowser() {
     document.getElementById('home-btn-nav').onclick = () => window.location.href = '../index.html';
     document.getElementById('devtools-btn').onclick = toggleDevTools;
     document.getElementById('wisp-settings-btn').onclick = openSettings;
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) themeToggle.onclick = toggleTheme;
 
     // Skip button logic
     const skipBtn = document.getElementById('skip-btn');
@@ -128,14 +162,30 @@ async function initializeBrowser() {
     }
 
     const addrBar = document.getElementById('address-bar');
-    addrBar.onkeyup = (e) => { if (e.key === 'Enter') handleSubmit(); };
-    addrBar.onfocus = () => addrBar.select();
+    if (addrBar) {
+        addrBar.onkeyup = (e) => { if (e.key === 'Enter') handleSubmit(); };
+        addrBar.onfocus = () => addrBar.select();
+    }
 
     window.addEventListener('message', (e) => {
-        if (e.data?.type === 'navigate') handleSubmit(e.data.url);
+        if (e.data?.type === 'navigate') {
+            handleSubmit(e.data.url);
+            return;
+        }
+        if (e.data?.type === 'setWisp' && e.data.url) {
+            setWisp(e.data.url);
+            return;
+        }
+        if (e.data?.type === 'setTheme' && e.data.theme) {
+            setTheme(e.data.theme);
+        }
     });
 
+    const newTabButton = document.getElementById('new-tab-btn');
+    if (newTabButton) newTabButton.onclick = () => createTab(true);
+    window.addEventListener('resize', updateTabsUI);
     createTab(true);
+    applyStoredTheme();
     checkHashParameters();
 }
 
@@ -151,7 +201,8 @@ function createTab(makeActive = true) {
         frame: frame,
         loading: false,
         favicon: null,
-        skipTimeout: null
+        skipTimeout: null,
+        showSkip: false
     };
 
     frame.frame.src = "NT.html";
@@ -159,19 +210,26 @@ function createTab(makeActive = true) {
     frame.addEventListener("urlchange", (e) => {
         tab.url = e.url;
         tab.loading = true;
+        tab.showSkip = false;
 
         // Show loading screen immediately if this is the active tab
         if (tab.id === activeTabId) {
             showIframeLoading(true, tab.url);
         }
 
-        try {
-            const urlObj = new URL(e.url);
-            tab.title = urlObj.hostname;
-            tab.favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-        } catch {
-            tab.title = "Browsing";
+        if (e.url.includes('NT.html')) {
+            tab.title = "New Tab";
+            tab.url = "";
             tab.favicon = null;
+        } else {
+            try {
+                const urlObj = new URL(e.url);
+                tab.title = urlObj.hostname;
+                tab.favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+            } catch {
+                tab.title = "Browsing";
+                tab.favicon = null;
+            }
         }
         updateTabsUI();
         updateAddressBar();
@@ -182,13 +240,17 @@ function createTab(makeActive = true) {
         tab.skipTimeout = setTimeout(() => {
             if (tab.loading && tab.id === activeTabId) {
                 const skipBtn = document.getElementById('skip-btn');
-                if (skipBtn) skipBtn.style.display = 'inline-block';
+                if (skipBtn) {
+                    skipBtn.style.display = 'inline-block';
+                    tab.showSkip = true;
+                }
             }
         }, 1000); // 1 second before skip button appears
     });
 
     frame.frame.addEventListener('load', () => {
         tab.loading = false;
+        tab.showSkip = false;
         if (tab.skipTimeout) clearTimeout(tab.skipTimeout);
 
         if (tab.id === activeTabId) {
@@ -232,7 +294,9 @@ function showIframeLoading(show, url = '') {
         if (show) {
             title.textContent = "Connecting";
             urlText.textContent = url || "Loading content...";
-            skipBtn.style.display = 'none'; // Reset skip button visibility
+            if (skipBtn) skipBtn.style.display = 'none'; // Reset skip button visibility
+        } else if (skipBtn) {
+            skipBtn.style.display = 'none';
         }
     }
 }
@@ -246,16 +310,9 @@ function switchTab(tabId) {
     // Update loading state for accessibiltiy
     if (tab) {
         showIframeLoading(tab.loading, tab.url);
-        // If this tab has been loading for > 5s, show skip button immediately
-        // Note: simplified logic, ideally we track start time
         const skipBtn = document.getElementById('skip-btn');
         if (tab.loading && skipBtn) {
-            // If we switched to a loading tab, we might want to check if the timeout passed, 
-            // but for now we'll just rely on the existing timeout or hide it initially.
-            // A better approach would be to track 'showSkip' state on the tab.
-            // For this implementation, we reset it to hidden to avoid immediate pop-in unless timeout fires.
-            // If timeout already fired for this tab, it might be tricky without storing state.
-            // Let's stick to the timeout firing or re-firing.
+            skipBtn.style.display = tab.showSkip ? 'inline-block' : 'none';
         }
     }
 
@@ -281,6 +338,7 @@ function closeTab(tabId) {
 
 function updateTabsUI() {
     const container = document.getElementById("tabs-container");
+    if (!container) return;
     container.innerHTML = "";
 
     tabs.forEach(tab => {
@@ -307,18 +365,34 @@ function updateTabsUI() {
         container.appendChild(el);
     });
 
-    const newBtn = document.createElement("button");
-    newBtn.className = "new-tab";
-    newBtn.innerHTML = "<i class='fa-solid fa-plus'></i>";
-    newBtn.onclick = () => createTab(true);
-    container.appendChild(newBtn);
+    const newTabButton = document.getElementById("new-tab-btn");
+    if (!newTabButton) {
+        const newBtn = document.createElement("button");
+        newBtn.className = "new-tab";
+        newBtn.innerHTML = "<i class='fa-solid fa-plus'></i>";
+        newBtn.onclick = () => createTab(true);
+        container.appendChild(newBtn);
+    }
+
+    const availableWidth = container.getBoundingClientRect().width || 0;
+    const tabCount = Math.max(tabs.length, 1);
+    const maxWidth = 220;
+    const minWidth = 120;
+    const gap = 6;
+    const targetWidth = Math.floor((availableWidth - gap * tabCount) / tabCount);
+    const tabWidth = Math.max(minWidth, Math.min(maxWidth, targetWidth));
+    container.style.setProperty('--tab-size', `${tabWidth}px`);
 }
 
 function updateAddressBar() {
     const bar = document.getElementById("address-bar");
     const tab = getActiveTab();
     if (bar && tab) {
-        bar.value = (tab.url && !tab.url.includes("NT.html")) ? tab.url : "";
+        if (!tab.url || tab.url.includes("NT.html") || tab.url === `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`) {
+            bar.value = "";
+            return;
+        }
+        bar.value = tab.url;
     }
 }
 
@@ -326,12 +400,19 @@ function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
 
 function handleSubmit(url) {
     const tab = getActiveTab();
-    let input = url || document.getElementById("address-bar").value.trim();
+    if (!tab) return;
+    const bar = document.getElementById("address-bar");
+    let input = url || bar?.value.trim();
     if (!input) return;
+
+    if (input.startsWith(INTERNAL_PROTOCOL)) {
+        handleInternalUrl(input, tab);
+        return;
+    }
 
     if (!input.startsWith('http')) {
         if (input.includes('.') && !input.includes(' ')) input = 'https://' + input;
-        else input = 'https://search.brave.com/search?q=' + encodeURIComponent(input);
+        else input = SEARCH_URL + encodeURIComponent(input);
     }
     tab.frame.go(input);
 }
@@ -339,6 +420,7 @@ function handleSubmit(url) {
 function updateLoadingBar(tab, percent) {
     if (tab.id !== activeTabId) return;
     const bar = document.getElementById("loading-bar");
+    if (!bar) return;
     bar.style.width = percent + "%";
     bar.style.opacity = percent === 100 ? "0" : "1";
     if (percent === 100) setTimeout(() => { bar.style.width = "0%"; }, 200);
@@ -348,17 +430,9 @@ function updateLoadingBar(tab, percent) {
 // SETTINGS & WISP
 // =====================================================
 function openSettings() {
-    const modal = document.getElementById('wisp-settings-modal');
-    modal.classList.remove('hidden');
-
-    document.getElementById('close-wisp-modal').onclick = () => modal.classList.add('hidden');
-    document.getElementById('save-custom-wisp').onclick = saveCustomWisp;
-
-    modal.onclick = (e) => {
-        if (e.target === modal) modal.classList.add('hidden');
-    };
-
-    renderServerList();
+    const tab = getActiveTab();
+    if (!tab) return;
+    handleInternalUrl(`${INTERNAL_PROTOCOL}${INTERNAL_PAGES.settings}`, tab);
 }
 
 function getStoredWisps() {
@@ -366,128 +440,9 @@ function getStoredWisps() {
     catch { return []; }
 }
 
-function renderServerList() {
-    const list = document.getElementById('server-list');
-    list.innerHTML = '';
-
-    const currentUrl = localStorage.getItem('proxServer') || DEFAULT_WISP;
-    const allWisps = [...WISP_SERVERS, ...getStoredWisps()];
-
-    allWisps.forEach((server, index) => {
-        const isActive = server.url === currentUrl;
-        const isCustom = index >= WISP_SERVERS.length;
-
-        const item = document.createElement('div');
-        item.className = `wisp-option ${isActive ? 'active' : ''}`;
-
-        const deleteBtn = isCustom
-            ? `<button class="delete-wisp-btn" onclick="event.stopPropagation(); deleteCustomWisp('${server.url}')"><i class="fa-solid fa-trash"></i></button>`
-            : '';
-
-        item.innerHTML = `
-            <div class="wisp-option-header">
-                <div class="wisp-option-name">
-                    ${server.name}
-                    ${isActive ? '<i class="fa-solid fa-check" style="margin-left:8px; font-size: 0.7em; color: var(--accent);"></i>' : ''}
-                </div>
-                <div class="server-status">
-                    <span class="ping-text">...</span>
-                    <div class="status-indicator"></div>
-                    ${deleteBtn}
-                </div>
-            </div>
-            <div class="wisp-option-url">${server.url}</div>
-        `;
-
-        item.onclick = () => setWisp(server.url);
-        list.appendChild(item);
-
-        checkServerHealth(server.url, item);
-    });
-}
-
-function saveCustomWisp() {
-    const input = document.getElementById('custom-wisp-input');
-    const url = input.value.trim();
-
-    if (!url) return;
-    if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
-        if (typeof Notify !== 'undefined') Notify.error('Invalid URL', 'URL must start with wss:// or ws://');
-        else alert("URL must start with wss:// or ws://");
-        return;
-    }
-
-    const customWisps = getStoredWisps();
-    if (customWisps.some(w => w.url === url) || WISP_SERVERS.some(w => w.url === url)) {
-        if (typeof Notify !== 'undefined') Notify.warning('Already Exists', 'This server is already in the list.');
-        else alert("This server is already in the list.");
-        return;
-    }
-
-    customWisps.push({ name: `Custom ${customWisps.length + 1}`, url });
-    localStorage.setItem('customWisps', JSON.stringify(customWisps));
-
-    if (typeof Notify !== 'undefined') Notify.success('Server Added', 'Custom server has been added.');
-
-    input.value = '';
-    renderServerList();
-}
-
-window.deleteCustomWisp = function (urlToDelete) {
-    if (!confirm("Remove this server?")) return;
-
-    let customWisps = getStoredWisps().filter(w => w.url !== urlToDelete);
-    localStorage.setItem('customWisps', JSON.stringify(customWisps));
-
-    if (localStorage.getItem('proxServer') === urlToDelete) {
-        setWisp(DEFAULT_WISP);
-    } else {
-        renderServerList();
-    }
-};
-
-async function checkServerHealth(url, element) {
-    const dot = element.querySelector('.status-indicator');
-    const text = element.querySelector('.ping-text');
-    const start = Date.now();
-
-    try {
-        const socket = new WebSocket(url);
-
-        const timeout = setTimeout(() => {
-            if (socket.readyState !== WebSocket.OPEN) {
-                socket.close();
-                markOffline();
-            }
-        }, 3000);
-
-        socket.onopen = () => {
-            clearTimeout(timeout);
-            const latency = Date.now() - start;
-            socket.close();
-
-            dot.classList.add('status-success');
-            text.textContent = `${latency}ms`;
-        };
-
-        socket.onerror = () => { clearTimeout(timeout); markOffline(); };
-
-    } catch { markOffline(); }
-
-    function markOffline() {
-        dot.classList.add('status-error');
-        text.textContent = "Offline";
-
-        // Notify if this is the currently selected wisp
-        const currentWisp = localStorage.getItem('proxServer') || DEFAULT_WISP;
-        if (url === currentWisp && typeof Notify !== 'undefined') {
-            Notify.error('Connection Failed', 'Current proxy server is offline. Try switching servers.');
-        }
-    }
-}
-
 function setWisp(url) {
     const oldUrl = localStorage.getItem('proxServer');
+    if (oldUrl === url) return;
     localStorage.setItem('proxServer', url);
 
     // Show notification before reload
@@ -526,4 +481,63 @@ async function checkHashParameters() {
         if (hash) handleSubmit(hash);
         history.replaceState(null, null, location.pathname);
     }
+}
+
+function showErrorMessage(message) {
+    const errorEl = document.getElementById("error");
+    const errorMessage = document.getElementById("error-message");
+    if (!errorEl || !errorMessage) return;
+    errorMessage.textContent = message;
+    errorEl.style.display = "flex";
+    showIframeLoading(false);
+}
+
+function handleInternalUrl(input, tab) {
+    const page = input.replace(INTERNAL_PROTOCOL, '').toLowerCase();
+    if (page === INTERNAL_PAGES.settings) {
+        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.settings}`;
+        tab.title = "Settings";
+        tab.favicon = null;
+        tab.loading = false;
+        tab.frame.frame.src = "settings.html";
+        updateTabsUI();
+        updateAddressBar();
+        showIframeLoading(false);
+        return;
+    }
+
+    if (page === INTERNAL_PAGES.newtab) {
+        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`;
+        tab.title = "New Tab";
+        tab.favicon = null;
+        tab.loading = false;
+        tab.frame.frame.src = "NT.html";
+        updateTabsUI();
+        updateAddressBar();
+        showIframeLoading(false);
+        return;
+    }
+
+    showErrorMessage("Unknown internal page.");
+}
+
+function applyStoredTheme() {
+    const theme = localStorage.getItem('theme') || 'dark';
+    setTheme(theme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.dataset.theme || 'dark';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+}
+
+function setTheme(theme) {
+    const nextTheme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem('theme', nextTheme);
+    const themeButtons = document.querySelectorAll('.theme-btn');
+    themeButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.theme === nextTheme);
+    });
 }

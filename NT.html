@@ -7,68 +7,30 @@
 
   <script src="../config.js"></script>
   <script src="../scripts/settings.js"></script>
-  <script src="../scripts/quotes.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap');
 
     :root {
-      /* Core colors */
-      --bg: #0a0a0a;
-      --surface: #0f0f0f;
-      --surface-hover: #1a1a1a;
-      --surface-active: #252525;
-      --border: #1f1f1f;
-      --border-light: #2a2a2a;
+      --bg: #0f1114;
+      --surface: #1b1e24;
+      --surface-hover: #232831;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e8eaed;
+      --text-muted: #9aa0a6;
+      --accent: #8ab4f8;
+      --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    }
 
-      /* Text */
-      --text: #e4e4e7;
-      --text-muted: #71717a;
-      --text-dim: #52525b;
-
-      /* Accent */
-      --accent: #ffffff;
-      --accent-dim: rgba(255, 255, 255, 0.8);
-      --accent-glow: rgba(255, 255, 255, 0.1);
-
-      /* Status colors */
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --info: #3b82f6;
-
-      /* Shadows */
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-      --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
-
-      /* Spacing */
-      --space-xs: 4px;
-      --space-sm: 8px;
-      --space-md: 16px;
-      --space-lg: 24px;
-      --space-xl: 32px;
-      --space-2xl: 48px;
-
-      /* Border radius */
-      --radius-sm: 4px;
-      --radius-md: 8px;
-      --radius-lg: 12px;
-      --radius-xl: 16px;
-      --radius-full: 9999px;
-
-      /* Transitions */
-      --transition-fast: 0.1s ease;
-      --transition-normal: 0.2s ease;
-      --transition-slow: 0.3s ease;
-
-      /* Typography */
-      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-
-      /* Background */
-      --bg-image: none;
+    [data-theme="light"] {
+      --bg: #f1f3f4;
+      --surface: #ffffff;
+      --surface-hover: #f5f7f8;
+      --border: rgba(60, 64, 67, 0.2);
+      --text: #202124;
+      --text-muted: #5f6368;
+      --accent: #1a73e8;
+      --shadow: 0 6px 20px rgba(60, 64, 67, 0.18);
     }
 
     * {
@@ -78,42 +40,35 @@
     }
 
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Roboto', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 40px 20px;
+      padding: 60px 24px;
     }
 
-    .clock {
-      font-size: 4rem;
-      font-weight: 600;
-      letter-spacing: -2px;
-      margin-bottom: 8px;
-      color: var(--accent);
-    }
-
-    .date {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-bottom: 32px;
+    .ntp {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
     }
 
     .search-box {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      width: 100%;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 16px;
-      width: 100%;
-      max-width: 500px;
-      margin-bottom: 40px;
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      box-shadow: var(--shadow);
     }
 
     .search-box i {
@@ -127,31 +82,15 @@
       border: none;
       outline: none;
       color: var(--text);
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    .search-box input::placeholder {
-      color: var(--text-dim);
-    }
-
-    .search-box select {
-      background: var(--surface-hover);
-      border: none;
-      border-radius: 6px;
-      color: var(--text-muted);
-      padding: 6px 10px;
-      font-size: 12px;
-      cursor: pointer;
-      outline: none;
+      font-size: 15px;
     }
 
     .shortcuts {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 16px;
-      max-width: 500px;
       width: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+      gap: 18px;
+      justify-items: center;
     }
 
     .shortcut {
@@ -161,18 +100,19 @@
       gap: 8px;
       text-decoration: none;
       cursor: pointer;
+      transition: transform 0.15s ease;
     }
 
     .shortcut-icon {
-      width: 52px;
-      height: 52px;
+      width: 56px;
+      height: 56px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.15s;
+      transition: all 0.15s ease;
     }
 
     .shortcut:hover .shortcut-icon {
@@ -181,9 +121,9 @@
     }
 
     .shortcut-icon img {
-      width: 22px;
-      height: 22px;
-      filter: brightness(0) invert(0.7);
+      width: 24px;
+      height: 24px;
+      filter: brightness(0) invert(0.8);
     }
 
     .shortcut-icon i {
@@ -195,7 +135,7 @@
       font-size: 11px;
       color: var(--text-muted);
       text-align: center;
-      max-width: 60px;
+      max-width: 70px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -203,15 +143,6 @@
 
     .shortcut:hover .shortcut-label {
       color: var(--text);
-    }
-
-    .quote {
-      position: fixed;
-      bottom: 24px;
-      font-size: 13px;
-      color: var(--text-dim);
-      max-width: 400px;
-      text-align: center;
     }
 
     .loader {
@@ -250,70 +181,62 @@
     <div class="spinner"></div>
   </div>
 
-  <div class="clock" id="clock">00:00</div>
-  <div class="date" id="date"></div>
+  <div class="ntp">
+    <form class="search-box" id="searchForm">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="searchInput" placeholder="Search Google or type a URL" autocomplete="off">
+    </form>
 
-  <form class="search-box" id="searchForm">
-    <i class="fa-solid fa-magnifying-glass"></i>
-    <input type="text" id="searchInput" placeholder="Search the web..." autocomplete="off">
-    <select id="engine">
-      <option value="https://search.brave.com/search?q=">Brave</option>
-      <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
-      <option value="https://www.google.com/search?q=">Google</option>
-    </select>
-  </form>
-
-  <div class="shortcuts" id="shortcuts">
-    <a class="shortcut" data-url="https://youtube.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/youtube.svg">
+    <div class="shortcuts" id="shortcuts">
+      <a class="shortcut" data-url="https://youtube.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/youtube.svg">
+        </div>
+        <span class="shortcut-label">YouTube</span>
+      </a>
+      <a class="shortcut" data-url="https://github.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/github.svg">
+        </div>
+        <span class="shortcut-label">GitHub</span>
+      </a>
+      <a class="shortcut" data-url="https://discord.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg">
+        </div>
+        <span class="shortcut-label">Discord</span>
+      </a>
+      <a class="shortcut" data-url="https://twitter.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/x.svg"></div>
+        <span class="shortcut-label">Twitter</span>
+      </a>
+      <a class="shortcut" data-url="https://reddit.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/reddit.svg">
+        </div>
+        <span class="shortcut-label">Reddit</span>
+      </a>
+      <a class="shortcut" data-url="https://spotify.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/spotify.svg">
+        </div>
+        <span class="shortcut-label">Spotify</span>
+      </a>
+      <a class="shortcut" data-url="https://netflix.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg">
+        </div>
+        <span class="shortcut-label">Netflix</span>
+      </a>
+      <a class="shortcut" data-url="https://twitch.tv">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/twitch.svg">
+        </div>
+        <span class="shortcut-label">Twitch</span>
+      </a>
+      <a class="shortcut" data-url="https://mail.google.com">
+        <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/gmail.svg"></div>
+        <span class="shortcut-label">Gmail</span>
+      </a>
+      <div class="shortcut" id="addShortcut">
+        <div class="shortcut-icon"><i class="fa-solid fa-plus"></i></div>
+        <span class="shortcut-label">Add</span>
       </div>
-      <span class="shortcut-label">YouTube</span>
-    </a>
-    <a class="shortcut" data-url="https://github.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/github.svg">
-      </div>
-      <span class="shortcut-label">GitHub</span>
-    </a>
-    <a class="shortcut" data-url="https://discord.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/discord.svg">
-      </div>
-      <span class="shortcut-label">Discord</span>
-    </a>
-    <a class="shortcut" data-url="https://twitter.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/x.svg"></div>
-      <span class="shortcut-label">Twitter</span>
-    </a>
-    <a class="shortcut" data-url="https://reddit.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/reddit.svg">
-      </div>
-      <span class="shortcut-label">Reddit</span>
-    </a>
-    <a class="shortcut" data-url="https://spotify.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/spotify.svg">
-      </div>
-      <span class="shortcut-label">Spotify</span>
-    </a>
-    <a class="shortcut" data-url="https://netflix.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/netflix.svg">
-      </div>
-      <span class="shortcut-label">Netflix</span>
-    </a>
-    <a class="shortcut" data-url="https://twitch.tv">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/twitch.svg">
-      </div>
-      <span class="shortcut-label">Twitch</span>
-    </a>
-    <a class="shortcut" data-url="https://mail.google.com">
-      <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/gmail.svg"></div>
-      <span class="shortcut-label">Gmail</span>
-    </a>
-    <div class="shortcut" id="addShortcut">
-      <div class="shortcut-icon"><i class="fa-solid fa-plus"></i></div>
-      <span class="shortcut-label">Add</span>
     </div>
   </div>
-
-  <div class="quote" id="quote"></div>
 
   <script>
     const $ = s => document.querySelector(s);
@@ -322,20 +245,11 @@
       window.parent?.postMessage({ type: 'navigate', url }, '*');
     };
 
-    // Clock
-    function updateClock() {
-      const now = new Date();
-      $('#clock').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-      $('#date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-    }
-    updateClock();
-    setInterval(updateClock, 1000);
-
     // Search
     $('#searchForm').onsubmit = e => {
       e.preventDefault();
       const q = $('#searchInput').value.trim();
-      if (q) nav($('#engine').value + encodeURIComponent(q));
+      if (q) nav('https://www.google.com/search?q=' + encodeURIComponent(q));
     };
 
     // Shortcuts
@@ -377,11 +291,8 @@
       });
     }
 
-    // Quote
-    if (window.QUOTES?.length) {
-      $('#quote').textContent = window.QUOTES[Math.floor(Math.random() * window.QUOTES.length)];
-    }
-
+    const storedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.dataset.theme = storedTheme;
     renderCustom();
   </script>
 </body>

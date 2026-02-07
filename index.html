@@ -25,31 +25,9 @@
 </head>
 
 <body>
-    <!-- Home Button -->
+    <div id="app" aria-label="Browser UI" role="application"></div>
 
-
-    <div id="app"></div>
-
-    <div class="wisp-settings-modal hidden" id="wisp-settings-modal">
-        <div class="settings-card">
-            <div class="settings-header">
-                <h2><i class="fa-solid fa-server"></i> Proxy Settings</h2>
-                <button class="close-btn" id="close-wisp-modal"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="settings-content">
-                <div class="section-title">Select Server</div>
-                <div class="server-list" id="server-list"></div>
-                <div class="section-title">Custom Server</div>
-                <div class="custom-input-group">
-                    <input type="text" id="custom-wisp-input" placeholder="wss://your-wisp-server.com/wisp/">
-                    <button id="save-custom-wisp"><i class="fa-solid fa-plus"></i></button>
-                </div>
-            </div>
-            <div class="settings-footer">
-                Lower ping = faster browsing
-            </div>
-        </div>
-    </div>
+    
 </body>
 
 </html>
