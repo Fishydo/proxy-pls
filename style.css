@@ -85,6 +85,51 @@
     --accent-strong: #4285f4;
 }
 
+[data-theme="graphite"] {
+    --bg: #1a1c22;
+    --surface: #252932;
+    --surface-hover: #2f3440;
+    --surface-active: #383f4d;
+    --border: rgba(255, 255, 255, 0.12);
+    --border-light: rgba(255, 255, 255, 0.2);
+    --text: #eceff4;
+    --text-muted: #aab2bd;
+    --accent: #9fb0ff;
+    --accent-dim: rgba(159, 176, 255, 0.7);
+    --accent-glow: rgba(159, 176, 255, 0.25);
+    --accent-strong: #bdc8ff;
+}
+
+[data-theme="forest"] {
+    --bg: #101913;
+    --surface: #17241b;
+    --surface-hover: #1f3125;
+    --surface-active: #27402f;
+    --border: rgba(153, 201, 165, 0.16);
+    --border-light: rgba(153, 201, 165, 0.25);
+    --text: #e6f2ea;
+    --text-muted: #a3bea9;
+    --accent: #7ed6a2;
+    --accent-dim: rgba(126, 214, 162, 0.7);
+    --accent-glow: rgba(126, 214, 162, 0.2);
+    --accent-strong: #97e5b8;
+}
+
+[data-theme="sunset"] {
+    --bg: #1c1311;
+    --surface: #271a16;
+    --surface-hover: #32211c;
+    --surface-active: #3d2821;
+    --border: rgba(255, 183, 138, 0.16);
+    --border-light: rgba(255, 183, 138, 0.25);
+    --text: #fff0e7;
+    --text-muted: #d7b5a3;
+    --accent: #ff9e6d;
+    --accent-dim: rgba(255, 158, 109, 0.75);
+    --accent-glow: rgba(255, 158, 109, 0.22);
+    --accent-strong: #ffb48d;
+}
+
 *,
 *::before,
 *::after {
@@ -364,6 +409,77 @@ input.bar::placeholder {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.extensions-menu {
+    position: absolute;
+    top: 88px;
+    right: 16px;
+    width: 320px;
+    max-height: 60vh;
+    overflow: auto;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 30;
+    padding: 10px;
+}
+
+.extensions-menu.hidden {
+    display: none;
+}
+
+.extensions-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.extensions-empty {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 8px;
+}
+
+.extension-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.extension-item-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.extension-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.mini-btn {
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 11px;
+    padding: 3px 7px;
+    cursor: pointer;
+}
+
+.extension-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
 }
 
 #home-btn-nav {

@@ -8,7 +8,9 @@ const WISP_SERVERS = [
     { name: "Rhw's Wisp", url: "wss://wisp.rhw.one/wisp/" }
 ];
 const SEARCH_URL = "https://search.brave.com/search?q=";
+const EXTENSIONS_KEY = "customExtensions";
 const INTERNAL_PROTOCOL = "lcc://";
+const THEMES = ["dark", "light", "graphite", "forest", "sunset"];
 const INTERNAL_PAGES = {
     settings: "settings",
     newtab: "newtab"
@@ -113,7 +115,8 @@ async function initializeBrowser() {
                     </div>
                     <input class="bar" id="address-bar" autocomplete="off" placeholder="Search Google or type a URL">
                     <div class="omnibox-actions">
-                        <button class="omnibox-btn" id="theme-toggle" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
+                        <button class="omnibox-btn" id="extensions-btn" title="Extensions"><i class="fa-solid fa-puzzle-piece"></i></button>
+                        <button class="omnibox-btn" id="theme-toggle" title="Cycle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
                     </div>
                 </div>
                 <div class="toolbar-actions">
@@ -138,6 +141,11 @@ async function initializeBrowser() {
                     </div>
                 </div>
             </div>
+            <div class="extensions-menu hidden" id="extensions-menu">
+                <div class="extensions-header">Extensions</div>
+                <div id="extensions-list"></div>
+                <div class="extensions-empty" id="extensions-empty">No extensions configured.</div>
+            </div>
         </div>`;
 
     document.getElementById('back-btn').onclick = () => getActiveTab()?.frame.back();
@@ -148,6 +156,20 @@ async function initializeBrowser() {
     document.getElementById('wisp-settings-btn').onclick = openSettings;
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) themeToggle.onclick = toggleTheme;
+    const extensionsBtn = document.getElementById('extensions-btn');
+    const extensionsMenu = document.getElementById('extensions-menu');
+    if (extensionsBtn && extensionsMenu) {
+        extensionsBtn.onclick = (e) => {
+            e.stopPropagation();
+            extensionsMenu.classList.toggle('hidden');
+            renderExtensionsMenu();
+        };
+        document.addEventListener('click', (event) => {
+            if (!extensionsMenu.contains(event.target) && event.target !== extensionsBtn) {
+                extensionsMenu.classList.add('hidden');
+            }
+        });
+    }
 
     // Skip button logic
     const skipBtn = document.getElementById('skip-btn');
@@ -178,6 +200,10 @@ async function initializeBrowser() {
         }
         if (e.data?.type === 'setTheme' && e.data.theme) {
             setTheme(e.data.theme);
+            return;
+        }
+        if (e.data?.type === 'extensionsUpdated') {
+            renderExtensionsMenu();
         }
     });
 
@@ -234,6 +260,7 @@ function createTab(makeActive = true) {
         updateTabsUI();
         updateAddressBar();
         updateLoadingBar(tab, 10);
+        renderExtensionsMenu();
 
         // Set timeout to show skip button
         if (tab.skipTimeout) clearTimeout(tab.skipTimeout);
@@ -271,6 +298,8 @@ function createTab(makeActive = true) {
         updateTabsUI();
         updateAddressBar();
         updateLoadingBar(tab, 100);
+        maybeRunExtensionsForTab(tab, tab.url);
+        renderExtensionsMenu();
     });
 
     tabs.push(tab);
@@ -417,6 +446,145 @@ function handleSubmit(url) {
     tab.frame.go(input);
 }
 
+function getStoredExtensions() {
+    try { return JSON.parse(localStorage.getItem(EXTENSIONS_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function setStoredExtensions(extensions) {
+    localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
+}
+
+function getUrlRuleInfo(rawUrl) {
+    try {
+        const parsed = new URL(rawUrl);
+        return { domain: parsed.hostname, path: parsed.pathname || '/' };
+    } catch {
+        return null;
+    }
+}
+
+function getActiveRuleInfo() {
+    const tab = getActiveTab();
+    if (!tab || !tab.url || tab.url.startsWith(INTERNAL_PROTOCOL) || tab.url.includes('NT.html')) return null;
+    return getUrlRuleInfo(tab.url);
+}
+
+function runExtensionCode(extension, tab) {
+    try {
+        const win = tab?.frame?.frame?.contentWindow;
+        if (!win || !extension?.code) return;
+        win.eval(extension.code);
+    } catch (error) {
+        console.warn(`Extension '${extension?.name || 'Unknown'}' failed:`, error);
+    }
+}
+
+function shouldRunExtensionOnUrl(extension, rawUrl) {
+    const info = getUrlRuleInfo(rawUrl);
+    if (!info || !Array.isArray(extension.rules)) return false;
+    return extension.rules.some((rule) => {
+        if (!rule.autoRun || rule.domain !== info.domain) return false;
+        if (rule.includeSubpaths) return true;
+        return rule.path === info.path;
+    });
+}
+
+function maybeRunExtensionsForTab(tab, rawUrl) {
+    if (!rawUrl || rawUrl.startsWith(INTERNAL_PROTOCOL) || rawUrl.includes('NT.html')) return;
+    const extensions = getStoredExtensions();
+    extensions.forEach((extension) => {
+        if (shouldRunExtensionOnUrl(extension, rawUrl)) {
+            runExtensionCode(extension, tab);
+        }
+    });
+}
+
+function toggleExtensionRule(extensionId, options) {
+    const info = getActiveRuleInfo();
+    if (!info) return;
+    const extensions = getStoredExtensions();
+    const extension = extensions.find((ext) => ext.id === extensionId);
+    if (!extension) return;
+
+    extension.rules = extension.rules || [];
+    let rule = extension.rules.find((entry) => entry.domain === info.domain && entry.path === info.path);
+
+    if (!rule) {
+        rule = {
+            domain: info.domain,
+            path: info.path,
+            includeSubpaths: false,
+            autoRun: false
+        };
+        extension.rules.push(rule);
+    }
+
+    if (typeof options.autoRun === 'boolean') rule.autoRun = options.autoRun;
+    if (typeof options.includeSubpaths === 'boolean') rule.includeSubpaths = options.includeSubpaths;
+
+    if (!rule.autoRun) {
+        extension.rules = extension.rules.filter((entry) => !(entry.domain === rule.domain && entry.path === rule.path));
+    }
+
+    setStoredExtensions(extensions);
+    renderExtensionsMenu();
+}
+
+function removeExtension(extensionId) {
+    const extensions = getStoredExtensions().filter((ext) => ext.id !== extensionId);
+    setStoredExtensions(extensions);
+    renderExtensionsMenu();
+}
+
+function renderExtensionsMenu() {
+    const list = document.getElementById('extensions-list');
+    const empty = document.getElementById('extensions-empty');
+    if (!list || !empty) return;
+
+    const extensions = getStoredExtensions();
+    const info = getActiveRuleInfo();
+    list.innerHTML = '';
+
+    if (extensions.length === 0) {
+        empty.style.display = 'block';
+        return;
+    }
+
+    empty.style.display = 'none';
+
+    extensions.forEach((extension) => {
+        const rule = info ? (extension.rules || []).find((entry) => entry.domain === info.domain && entry.path === info.path) : null;
+        const row = document.createElement('div');
+        row.className = 'extension-item';
+        row.innerHTML = `
+            <div class="extension-item-head">
+                <strong>${extension.name}</strong>
+                <div class="extension-actions">
+                    <button class="mini-btn run-now">Run</button>
+                    <button class="mini-btn remove">Remove</button>
+                </div>
+            </div>
+            <label class="extension-toggle"><input type="checkbox" class="auto-run" ${rule?.autoRun ? 'checked' : ''}> Run on this page automatically</label>
+            <label class="extension-toggle"><input type="checkbox" class="all-paths" ${rule?.includeSubpaths ? 'checked' : ''} ${rule?.autoRun ? '' : 'disabled'}> Run on all paths for this domain</label>
+        `;
+
+        row.querySelector('.run-now')?.addEventListener('click', () => {
+            const tab = getActiveTab();
+            if (tab) runExtensionCode(extension, tab);
+        });
+        row.querySelector('.remove')?.addEventListener('click', () => removeExtension(extension.id));
+        row.querySelector('.auto-run')?.addEventListener('change', (event) => {
+            toggleExtensionRule(extension.id, { autoRun: event.target.checked });
+        });
+        row.querySelector('.all-paths')?.addEventListener('change', (event) => {
+            toggleExtensionRule(extension.id, { includeSubpaths: event.target.checked, autoRun: true });
+        });
+
+        list.appendChild(row);
+    });
+}
+
 function updateLoadingBar(tab, percent) {
     if (tab.id !== activeTabId) return;
     const bar = document.getElementById("loading-bar");
@@ -528,12 +696,13 @@ function applyStoredTheme() {
 
 function toggleTheme() {
     const currentTheme = document.documentElement.dataset.theme || 'dark';
-    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    const index = THEMES.indexOf(currentTheme);
+    const nextTheme = THEMES[(index + 1) % THEMES.length] || 'dark';
     setTheme(nextTheme);
 }
 
 function setTheme(theme) {
-    const nextTheme = theme === 'light' ? 'light' : 'dark';
+    const nextTheme = THEMES.includes(theme) ? theme : 'dark';
     document.documentElement.dataset.theme = nextTheme;
     localStorage.setItem('theme', nextTheme);
     const themeButtons = document.querySelectorAll('.theme-btn');
