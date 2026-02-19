@@ -32,6 +32,46 @@ let tabs = [];
 let activeTabId = null;
 let nextTabId = 1;
 
+function getAllWispCandidates(preferred) {
+    const custom = getStoredWisps();
+    const pool = [...WISP_SERVERS, ...custom].map((item) => item.url);
+    const deduped = [...new Set([preferred, ...pool].filter(Boolean))];
+    return deduped;
+}
+
+function probeWisp(url, timeoutMs = 2500) {
+    return new Promise((resolve) => {
+        try {
+            const socket = new WebSocket(url);
+            const timeout = setTimeout(() => {
+                try { socket.close(); } catch { }
+                resolve(false);
+            }, timeoutMs);
+
+            socket.onopen = () => {
+                clearTimeout(timeout);
+                try { socket.close(); } catch { }
+                resolve(true);
+            };
+
+            socket.onerror = () => {
+                clearTimeout(timeout);
+                resolve(false);
+            };
+        } catch {
+            resolve(false);
+        }
+    });
+}
+
+async function resolveWorkingWisp(preferred) {
+    const candidates = getAllWispCandidates(preferred);
+    for (const candidate of candidates) {
+        if (await probeWisp(candidate)) return candidate;
+    }
+    return preferred || DEFAULT_WISP;
+}
+
 // =====================================================
 // INITIALIZATION
 // =====================================================
@@ -55,25 +95,30 @@ document.addEventListener('DOMContentLoaded', async function () {
         if ('serviceWorker' in navigator) {
             const reg = await navigator.serviceWorker.register(basePath + 'sw.js', { scope: basePath });
             await navigator.serviceWorker.ready;
-            const wispUrl = localStorage.getItem("proxServer") || DEFAULT_WISP;
+            const preferredWisp = localStorage.getItem("proxServer") || DEFAULT_WISP;
+            const wispUrl = await resolveWorkingWisp(preferredWisp);
+            if (wispUrl !== preferredWisp) {
+                localStorage.setItem("proxServer", wispUrl);
+                console.warn(`Preferred Wisp unavailable, switched to: ${wispUrl}`);
+            }
 
             // Try to send to both active registration and controller to be safe
             const sw = reg.active || navigator.serviceWorker.controller;
             if (sw) {
                 console.log("Sending config to SW:", wispUrl);
-                sw.postMessage({ type: "config", wispurl: wispUrl });
+                sw.postMessage({ type: "config", wispurl: wispUrl, wispCandidates: getAllWispCandidates(wispUrl) });
             }
 
             // Ensure controller also gets it if different
             if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== sw) {
-                navigator.serviceWorker.controller.postMessage({ type: "config", wispurl: wispUrl });
+                navigator.serviceWorker.controller.postMessage({ type: "config", wispurl: wispUrl, wispCandidates: getAllWispCandidates(wispUrl) });
             }
 
             // Force update to get new SW code if available
             reg.update();
 
             const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispUrl }]);
+            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: wispUrl }]);
         }
 
         await initializeBrowser();
@@ -620,7 +665,7 @@ function setWisp(url) {
     }
 
     if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'config', wispurl: url });
+        navigator.serviceWorker.controller.postMessage({ type: 'config', wispurl: url, wispCandidates: getAllWispCandidates(url) });
     }
 
     // Small delay to show notification

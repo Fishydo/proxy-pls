@@ -43,6 +43,7 @@ const configReadyPromise = new Promise(resolve => resolveConfigReady = resolve);
 self.addEventListener("message", ({ data }) => {
     if (data.type === "config" && data.wispurl) {
         wispConfig.wispurl = data.wispurl;
+        wispConfig.wispCandidates = Array.isArray(data.wispCandidates) ? data.wispCandidates : [data.wispurl];
         console.log("SW: Received config", wispConfig);
         if (resolveConfigReady) {
             resolveConfigReady();
@@ -67,9 +68,25 @@ scramjet.addEventListener("request", async (e) => {
             await configReadyPromise;
             if (!wispConfig.wispurl) return new Response("WISP URL missing", { status: 500 });
 
-            const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispConfig.wispurl }]);
-            scramjet.client = connection;
+            const candidates = [...new Set([wispConfig.wispurl, ...(wispConfig.wispCandidates || [])])];
+            let lastTransportError;
+
+            for (const candidate of candidates) {
+                try {
+                    const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
+                    await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: candidate }]);
+                    scramjet.client = connection;
+                    wispConfig.wispurl = candidate;
+                    break;
+                } catch (error) {
+                    lastTransportError = error;
+                    console.warn(`SW: Failed Wisp transport ${candidate}`, error);
+                }
+            }
+
+            if (!scramjet.client) {
+                return new Response("WISP transport init failed: " + (lastTransportError?.message || "Unknown error"), { status: 502 });
+            }
         }
         const MAX_RETRIES = 2;
         const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
