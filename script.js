@@ -268,7 +268,8 @@ function createTab(makeActive = true) {
         loading: false,
         favicon: null,
         skipTimeout: null,
-        showSkip: false
+        showSkip: false,
+        navCount: 0
     };
 
     frame.frame.src = "NT.html";
@@ -277,6 +278,7 @@ function createTab(makeActive = true) {
         tab.url = e.url;
         tab.loading = true;
         tab.showSkip = false;
+        tab.navCount += 1;
 
         // Show loading screen immediately if this is the active tab
         if (tab.id === activeTabId) {
@@ -492,11 +494,26 @@ function getStoredExtensions() {
 function setStoredExtensions(extensions) {
     localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
 }
+function normalizeRulePath(pathname) {
+    if (!pathname) return '/';
+    const normalized = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+    return normalized || '/';
+}
+
+function getLastRanMap() {
+    if (!window.__extLastRun) window.__extLastRun = new Map();
+    return window.__extLastRun;
+}
+
 
 function getUrlRuleInfo(rawUrl) {
     try {
         const parsed = new URL(rawUrl);
-        return { domain: parsed.hostname, path: parsed.pathname || '/' };
+        return {
+            domain: parsed.hostname.toLowerCase(),
+            path: normalizeRulePath(parsed.pathname || '/'),
+            full: parsed.href
+        };
     } catch {
         return null;
     }
@@ -512,7 +529,22 @@ function runExtensionCode(extension, tab) {
     try {
         const win = tab?.frame?.frame?.contentWindow;
         if (!win || !extension?.code) return;
-        win.eval(extension.code);
+
+        try {
+            win.eval(extension.code);
+            return;
+        } catch { }
+
+        try {
+            const runner = new win.Function(extension.code);
+            runner();
+            return;
+        } catch { }
+
+        const script = win.document.createElement('script');
+        script.textContent = extension.code;
+        (win.document.head || win.document.documentElement || win.document.body).appendChild(script);
+        script.remove();
     } catch (error) {
         console.warn(`Extension '${extension?.name || 'Unknown'}' failed:`, error);
     }
@@ -524,16 +556,22 @@ function shouldRunExtensionOnUrl(extension, rawUrl) {
     return extension.rules.some((rule) => {
         if (!rule.autoRun || rule.domain !== info.domain) return false;
         if (rule.includeSubpaths) return true;
-        return rule.path === info.path;
+        return normalizeRulePath(rule.path) === info.path;
     });
 }
 
 function maybeRunExtensionsForTab(tab, rawUrl) {
     if (!rawUrl || rawUrl.startsWith(INTERNAL_PROTOCOL) || rawUrl.includes('NT.html')) return;
+    const info = getUrlRuleInfo(rawUrl);
+    if (!info) return;
+    const lastRan = getLastRanMap();
     const extensions = getStoredExtensions();
     extensions.forEach((extension) => {
         if (shouldRunExtensionOnUrl(extension, rawUrl)) {
+            const runKey = `${extension.id}:${tab?.id || 0}:${tab?.navCount || 0}:${info.full}`;
+            if (lastRan.get(runKey)) return;
             runExtensionCode(extension, tab);
+            lastRan.set(runKey, Date.now());
         }
     });
 }
@@ -551,7 +589,7 @@ function toggleExtensionRule(extensionId, options) {
     if (!rule) {
         rule = {
             domain: info.domain,
-            path: info.path,
+            path: normalizeRulePath(info.path),
             includeSubpaths: false,
             autoRun: false
         };
