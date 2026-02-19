@@ -142,9 +142,6 @@ async function initializeBrowser() {
             <div class="tab-strip">
                 <div class="tab-strip-left">
                     <div class="tabs" id="tabs-container"></div>
-                    <button class="tab-action" id="new-tab-btn" title="New Tab">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
                 </div>
             </div>
             <div class="toolbar">
@@ -252,8 +249,6 @@ async function initializeBrowser() {
         }
     });
 
-    const newTabButton = document.getElementById('new-tab-btn');
-    if (newTabButton) newTabButton.onclick = () => createTab(true);
     window.addEventListener('resize', updateTabsUI);
     createTab(true);
     applyStoredTheme();
@@ -439,21 +434,19 @@ function updateTabsUI() {
         container.appendChild(el);
     });
 
-    const newTabButton = document.getElementById("new-tab-btn");
-    if (!newTabButton) {
-        const newBtn = document.createElement("button");
-        newBtn.className = "new-tab";
-        newBtn.innerHTML = "<i class='fa-solid fa-plus'></i>";
-        newBtn.onclick = () => createTab(true);
-        container.appendChild(newBtn);
-    }
+    const newBtn = document.createElement("button");
+    newBtn.className = "tab-action";
+    newBtn.innerHTML = "<i class='fa-solid fa-plus'></i>";
+    newBtn.title = "New Tab";
+    newBtn.onclick = () => createTab(true);
+    container.appendChild(newBtn);
 
     const availableWidth = container.getBoundingClientRect().width || 0;
     const tabCount = Math.max(tabs.length, 1);
     const maxWidth = 220;
     const minWidth = 120;
     const gap = 6;
-    const targetWidth = Math.floor((availableWidth - gap * tabCount) / tabCount);
+    const targetWidth = Math.floor((availableWidth - 38 - gap * tabCount) / tabCount);
     const tabWidth = Math.max(minWidth, Math.min(maxWidth, targetWidth));
     container.style.setProperty('--tab-size', `${tabWidth}px`);
 }

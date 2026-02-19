@@ -91,13 +91,24 @@ scramjet.addEventListener("request", async (e) => {
         const MAX_RETRIES = 2;
         const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
         let lastErr;
+        const normalizeHeaders = (input) => {
+            if (!input) return {};
+            if (typeof Headers !== "undefined" && input instanceof Headers) {
+                return Object.fromEntries(input.entries());
+            }
+            if (Array.isArray(input)) {
+                try { return Object.fromEntries(input); } catch { return {}; }
+            }
+            if (typeof input === "object") return input;
+            return {};
+        };
 
         for (let i = 0; i <= MAX_RETRIES; i++) {
             try {
                 return await scramjet.client.fetch(e.url, {
                     method: e.method,
                     body: e.body,
-                    headers: e.requestHeaders,
+                    headers: normalizeHeaders(e.requestHeaders),
                     credentials: "include",
                     mode: e.mode === "cors" ? e.mode : "same-origin",
                     cache: e.cache,
