@@ -494,6 +494,25 @@ function getStoredExtensions() {
 function setStoredExtensions(extensions) {
     localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
 }
+
+function decodePossibleTargetUrl(rawUrl) {
+    if (!rawUrl) return rawUrl;
+    const direct = rawUrl.match(/https?:\/\/.+$/i);
+    if (direct) return direct[0];
+
+    const encodedMatch = rawUrl.match(/https?%3A%2F%2F[^&]+/i);
+    if (encodedMatch) {
+        try { return decodeURIComponent(encodedMatch[0]); } catch { }
+    }
+
+    const paramMatch = rawUrl.match(/[?&](url|target|dest)=([^&]+)/i);
+    if (paramMatch) {
+        try { return decodeURIComponent(paramMatch[2]); } catch { }
+    }
+
+    return rawUrl;
+}
+
 function normalizeRulePath(pathname) {
     if (!pathname) return '/';
     const normalized = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -508,7 +527,7 @@ function getLastRanMap() {
 
 function getUrlRuleInfo(rawUrl) {
     try {
-        const parsed = new URL(rawUrl);
+        const parsed = new URL(decodePossibleTargetUrl(rawUrl));
         return {
             domain: parsed.hostname.toLowerCase(),
             path: normalizeRulePath(parsed.pathname || '/'),
@@ -568,7 +587,7 @@ function maybeRunExtensionsForTab(tab, rawUrl) {
     const extensions = getStoredExtensions();
     extensions.forEach((extension) => {
         if (shouldRunExtensionOnUrl(extension, rawUrl)) {
-            const runKey = `${extension.id}:${tab?.id || 0}:${tab?.navCount || 0}:${info.full}`;
+            const runKey = `${extension.id}:${tab?.id || 0}:${tab?.navCount || 0}:${info.domain}${info.path}`;
             if (lastRan.get(runKey)) return;
             runExtensionCode(extension, tab);
             lastRan.set(runKey, Date.now());

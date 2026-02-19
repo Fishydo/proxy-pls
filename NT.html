@@ -93,6 +93,36 @@
       gap: 32px;
     }
 
+    .shortcuts-head {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .shortcuts-head h3 {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .newtab-maker {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .newtab-maker:hover {
+      background: var(--surface-hover);
+      transform: translateY(-1px);
+    }
+
     .search-box {
       width: 100%;
       background: var(--surface);
@@ -221,6 +251,11 @@
       <input type="text" id="searchInput" placeholder="Search Google or type a URL" autocomplete="off">
     </form>
 
+    <div class="shortcuts-head">
+      <h3>Shortcuts</h3>
+      <button class="newtab-maker" id="addShortcutButton"><i class="fa-solid fa-plus"></i> Add shortcut</button>
+    </div>
+
     <div class="shortcuts" id="shortcuts">
       <a class="shortcut" data-url="https://youtube.com">
         <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/youtube.svg">
@@ -265,10 +300,6 @@
         <div class="shortcut-icon"><img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/gmail.svg"></div>
         <span class="shortcut-label">Gmail</span>
       </a>
-      <div class="shortcut" id="addShortcut">
-        <div class="shortcut-icon"><i class="fa-solid fa-plus"></i></div>
-        <span class="shortcut-label">Add</span>
-      </div>
     </div>
   </div>
 
@@ -289,7 +320,7 @@
     // Shortcuts
     $('#shortcuts').onclick = e => {
       const shortcut = e.target.closest('.shortcut[data-url]');
-      const addBtn = e.target.closest('#addShortcut');
+      const addBtn = e.target.closest('#addShortcutButton');
 
       if (shortcut) {
         e.preventDefault();
@@ -311,7 +342,7 @@
     function renderCustom() {
       document.querySelectorAll('.custom-shortcut').forEach(e => e.remove());
       const shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
-      const addBtn = $('#addShortcut');
+      const addBtn = $('#addShortcutButton');
 
       shortcuts.forEach(s => {
         const div = document.createElement('div');
@@ -321,9 +352,22 @@
           <div class="shortcut-icon"><i class="fa-solid fa-link"></i></div>
           <span class="shortcut-label">${s.name}</span>
         `;
-        addBtn.before(div);
+        document.getElementById('shortcuts').appendChild(div);
       });
     }
+
+    document.getElementById('addShortcutButton').onclick = () => {
+      const name = prompt("Shortcut name:");
+      if (!name) return;
+      let url = prompt("URL:");
+      if (!url) return;
+      if (!url.startsWith('http')) url = 'https://' + url;
+
+      const shortcuts = JSON.parse(localStorage.getItem('shortcuts') || '[]');
+      shortcuts.push({ name, url });
+      localStorage.setItem('shortcuts', JSON.stringify(shortcuts));
+      renderCustom();
+    };
 
     const storedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.dataset.theme = storedTheme;

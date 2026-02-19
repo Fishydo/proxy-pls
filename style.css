@@ -177,6 +177,7 @@ body::before {
     justify-content: space-between;
     padding: 6px 10px 0;
     background: var(--bg);
+    border-bottom: 1px solid var(--border);
 }
 
 .tab-strip-left {
@@ -210,10 +211,12 @@ body::before {
     max-width: 240px;
     background: transparent;
     border: 1px solid transparent;
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid transparent;
+    border-radius: 14px 14px 0 0;
     cursor: pointer;
-    transition: background var(--transition-normal), border-color var(--transition-normal), transform var(--transition-normal);
+    transition: background var(--transition-normal), border-color var(--transition-normal), transform var(--transition-normal), opacity var(--transition-normal);
+    opacity: 0.94;
+    position: relative;
 }
 
 .tab:hover {
@@ -224,10 +227,29 @@ body::before {
     background: var(--surface-active);
     border-color: rgba(255, 255, 255, 0.08);
     color: var(--text);
+    opacity: 1;
+    transform: translateY(1px);
 }
 
 .tab + .tab {
     margin-left: -8px;
+}
+
+.tab::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    bottom: -1px;
+    height: 8px;
+    border-radius: 0 0 10px 10px;
+    background: inherit;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.tab.active::after {
+    opacity: 1;
 }
 
 .tab-favicon {
@@ -512,10 +534,13 @@ input.bar::placeholder {
     height: 100%;
     border: none;
     position: absolute;
+    opacity: 1;
+    transition: opacity var(--transition-normal), filter 0.5s ease;
 }
 
 .iframe-container iframe.hidden {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .iframe-container iframe.loading {

@@ -103,12 +103,22 @@ scramjet.addEventListener("request", async (e) => {
             return {};
         };
 
+        const toIterableHeaders = (input) => {
+            const normalized = normalizeHeaders(input);
+            try {
+                if (Array.isArray(normalized)) return normalized;
+                return Object.entries(normalized || {});
+            } catch {
+                return [];
+            }
+        };
+
         for (let i = 0; i <= MAX_RETRIES; i++) {
             try {
                 return await scramjet.client.fetch(e.url, {
                     method: e.method,
                     body: e.body,
-                    headers: normalizeHeaders(e.requestHeaders),
+                    headers: toIterableHeaders(e.requestHeaders),
                     credentials: "include",
                     mode: e.mode === "cors" ? e.mode : "same-origin",
                     cache: e.cache,
@@ -117,7 +127,7 @@ scramjet.addEventListener("request", async (e) => {
                 });
             } catch (err) {
                 lastErr = err;
-                const errMsg = err.message.toLowerCase();
+                const errMsg = String(err?.message || err).toLowerCase();
                 const isRetryable = RETRYABLE_ERRORS.some((message) => errMsg.includes(message));
 
                 if (!isRetryable || i === MAX_RETRIES || e.method !== 'GET') break;
