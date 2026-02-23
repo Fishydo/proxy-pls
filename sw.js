@@ -91,13 +91,13 @@ scramjet.addEventListener("request", async (e) => {
         const MAX_RETRIES = 2;
         const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
         let lastErr;
-        const toSanitizedHeaders = (input) => {
-            const output = {};
+        const toHeaderEntries = (input) => {
+            const output = [];
 
             const assign = (key, value) => {
                 if (typeof key !== "string" || !key) return;
                 if (value === undefined || value === null) return;
-                output[key] = String(value);
+                output.push([key, String(value)]);
             };
 
             if (!input) return output;
@@ -127,7 +127,7 @@ scramjet.addEventListener("request", async (e) => {
                 return await scramjet.client.fetch(e.url, {
                     method: e.method,
                     body: e.body,
-                    headers: toSanitizedHeaders(e.requestHeaders),
+                    headers: toHeaderEntries(e.requestHeaders),
                     credentials: "include",
                     redirect: "manual",
                 });
