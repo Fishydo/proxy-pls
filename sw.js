@@ -91,26 +91,35 @@ scramjet.addEventListener("request", async (e) => {
         const MAX_RETRIES = 2;
         const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
         let lastErr;
-        const normalizeHeaders = (input) => {
-            if (!input) return {};
-            if (typeof Headers !== "undefined" && input instanceof Headers) {
-                return Object.fromEntries(input.entries());
-            }
-            if (Array.isArray(input)) {
-                try { return Object.fromEntries(input); } catch { return {}; }
-            }
-            if (typeof input === "object") return input;
-            return {};
-        };
+        const toSanitizedHeaders = (input) => {
+            const output = {};
 
-        const toIterableHeaders = (input) => {
-            const normalized = normalizeHeaders(input);
-            try {
-                if (Array.isArray(normalized)) return normalized;
-                return Object.entries(normalized || {});
-            } catch {
-                return [];
+            const assign = (key, value) => {
+                if (typeof key !== "string" || !key) return;
+                if (value === undefined || value === null) return;
+                output[key] = String(value);
+            };
+
+            if (!input) return output;
+
+            if (typeof Headers !== "undefined" && input instanceof Headers) {
+                for (const [key, value] of input.entries()) assign(key, value);
+                return output;
             }
+
+            if (Array.isArray(input)) {
+                for (const entry of input) {
+                    if (!Array.isArray(entry) || entry.length < 2) continue;
+                    assign(entry[0], entry[1]);
+                }
+                return output;
+            }
+
+            if (typeof input === "object") {
+                for (const [key, value] of Object.entries(input)) assign(key, value);
+            }
+
+            return output;
         };
 
         for (let i = 0; i <= MAX_RETRIES; i++) {
@@ -118,12 +127,9 @@ scramjet.addEventListener("request", async (e) => {
                 return await scramjet.client.fetch(e.url, {
                     method: e.method,
                     body: e.body,
-                    headers: toIterableHeaders(e.requestHeaders),
+                    headers: toSanitizedHeaders(e.requestHeaders),
                     credentials: "include",
-                    mode: e.mode === "cors" ? e.mode : "same-origin",
-                    cache: e.cache,
                     redirect: "manual",
-                    duplex: "half",
                 });
             } catch (err) {
                 lastErr = err;

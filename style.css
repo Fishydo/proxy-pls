@@ -188,6 +188,13 @@ body::before {
     min-width: 0;
 }
 
+.tab-strip-right {
+    display: flex;
+    align-items: flex-end;
+    margin-left: 8px;
+    padding-bottom: 2px;
+}
+
 .tabs {
     display: flex;
     gap: 0;
@@ -299,11 +306,16 @@ body::before {
     background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     transition: all var(--transition-normal);
     font-size: 14px;
     flex-shrink: 0;
+}
+
+.tab-action-new {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
 }
 
 .tab-action:hover {
