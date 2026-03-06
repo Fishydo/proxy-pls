@@ -43,6 +43,7 @@ const configReadyPromise = new Promise(resolve => resolveConfigReady = resolve);
 self.addEventListener("message", ({ data }) => {
     if (data.type === "config" && data.wispurl) {
         wispConfig.wispurl = data.wispurl;
+        wispConfig.wispCandidates = Array.isArray(data.wispCandidates) ? data.wispCandidates : [data.wispurl];
         console.log("SW: Received config", wispConfig);
         if (resolveConfigReady) {
             resolveConfigReady();
@@ -67,29 +68,71 @@ scramjet.addEventListener("request", async (e) => {
             await configReadyPromise;
             if (!wispConfig.wispurl) return new Response("WISP URL missing", { status: 500 });
 
-            const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs", [{ wisp: wispConfig.wispurl }]);
-            scramjet.client = connection;
+            const candidates = [...new Set([wispConfig.wispurl, ...(wispConfig.wispCandidates || [])])];
+            let lastTransportError;
+
+            for (const candidate of candidates) {
+                try {
+                    const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
+                    await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: candidate }]);
+                    scramjet.client = connection;
+                    wispConfig.wispurl = candidate;
+                    break;
+                } catch (error) {
+                    lastTransportError = error;
+                    console.warn(`SW: Failed Wisp transport ${candidate}`, error);
+                }
+            }
+
+            if (!scramjet.client) {
+                return new Response("WISP transport init failed: " + (lastTransportError?.message || "Unknown error"), { status: 502 });
+            }
         }
         const MAX_RETRIES = 2;
         const RETRYABLE_ERRORS = ["connect", "eof", "handshake", "reset"];
         let lastErr;
+        const toHeaderEntries = (input) => {
+            const output = [];
+
+            const assign = (key, value) => {
+                if (typeof key !== "string" || !key) return;
+                if (value === undefined || value === null) return;
+                output.push([key, String(value)]);
+            };
+
+            if (!input) return output;
+
+            if (typeof Headers !== "undefined" && input instanceof Headers) {
+                for (const [key, value] of input.entries()) assign(key, value);
+                return output;
+            }
+
+            if (Array.isArray(input)) {
+                for (const entry of input) {
+                    if (!Array.isArray(entry) || entry.length < 2) continue;
+                    assign(entry[0], entry[1]);
+                }
+                return output;
+            }
+
+            if (typeof input === "object") {
+                for (const [key, value] of Object.entries(input)) assign(key, value);
+            }
+
+            return output;
+        };
 
         for (let i = 0; i <= MAX_RETRIES; i++) {
             try {
                 return await scramjet.client.fetch(e.url, {
                     method: e.method,
                     body: e.body,
-                    headers: e.requestHeaders,
+                    headers: toHeaderEntries(e.requestHeaders),
                     credentials: "include",
-                    mode: e.mode === "cors" ? e.mode : "same-origin",
-                    cache: e.cache,
                     redirect: "manual",
-                    duplex: "half",
                 });
             } catch (err) {
                 lastErr = err;
-                const errMsg = err.message.toLowerCase();
                 const isRetryable = RETRYABLE_ERRORS.some((message) => errMsg.includes(message));
 
                 if (!isRetryable || i === MAX_RETRIES || e.method !== 'GET') break;

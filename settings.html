@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+    :root {
+      --bg: #101216;
+      --surface: #1c2026;
+      --surface-hover: #232931;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e8eaed;
+      --text-muted: #9aa0a6;
+      --accent: #8ab4f8;
+    }
+
+    [data-theme="light"] {
+      --bg: #f1f3f4;
+      --surface: #ffffff;
+      --surface-hover: #f5f7f8;
+      --border: rgba(60, 64, 67, 0.2);
+      --text: #202124;
+      --text-muted: #5f6368;
+      --accent: #1a73e8;
+    }
+
+    [data-theme="graphite"] {
+      --bg: #1a1c22;
+      --surface: #252932;
+      --surface-hover: #2f3440;
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #eceff4;
+      --text-muted: #aab2bd;
+      --accent: #9fb0ff;
+    }
+
+    [data-theme="forest"] {
+      --bg: #101913;
+      --surface: #17241b;
+      --surface-hover: #1f3125;
+      --border: rgba(153, 201, 165, 0.16);
+      --text: #e6f2ea;
+      --text-muted: #a3bea9;
+      --accent: #7ed6a2;
+    }
+
+    [data-theme="sunset"] {
+      --bg: #1c1311;
+      --surface: #271a16;
+      --surface-hover: #32211c;
+      --border: rgba(255, 183, 138, 0.16);
+      --text: #fff0e7;
+      --text-muted: #d7b5a3;
+      --accent: #ff9e6d;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Roboto', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar { border-right: 1px solid var(--border); background: var(--surface); padding: 24px 16px; }
+    .sidebar h1 { margin: 0 0 16px; font-size: 19px; }
+    .nav-item {
+      width: 100%; border: none; background: transparent; color: var(--text);
+      text-align: left; padding: 11px 12px; border-radius: 10px; margin-bottom: 6px;
+      cursor: pointer; font-size: 14px;
+    }
+    .nav-item.active,.nav-item:hover { background: var(--surface-hover); }
+
+    .content { padding: 28px 34px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 16px; }
+    .card h2 { margin: 0 0 8px; font-size: 18px; }
+    .desc { margin: 0 0 14px; color: var(--text-muted); font-size: 13px; }
+
+    .themes { display: grid; grid-template-columns: repeat(3,minmax(120px,1fr)); gap: 10px; }
+    .theme-btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 10px; height: 36px; cursor: pointer; }
+    .theme-btn.active,.theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .server-item, .extension-item {
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .server-item.active { border-color: var(--accent); }
+    .muted { color: var(--text-muted); font-size: 12px; }
+
+    .row { display: flex; gap: 10px; }
+    input, textarea {
+      width: 100%; background: transparent; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 10px; font-family: inherit;
+    }
+    textarea { min-height: 130px; resize: vertical; }
+
+    .btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .rules { display: flex; flex-direction: column; gap: 6px; }
+    .rule { font-size: 12px; color: var(--text-muted); }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <h1>Settings</h1>
+      <button class="nav-item active" data-page="appearance">Appearance</button>
+      <button class="nav-item" data-page="proxy">Proxy</button>
+      <button class="nav-item" data-page="extensions">Extensions</button>
+    </aside>
+    <main class="content">
+      <section class="page active" id="page-appearance">
+        <div class="card">
+          <h2>Themes</h2>
+          <p class="desc">Pick a browser theme. This applies to browser UI, new tab, and settings.</p>
+          <div class="themes" id="themes"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-proxy">
+        <div class="card">
+          <h2>Proxy servers</h2>
+          <p class="desc">Select a Wisp server. Changes apply immediately.</p>
+          <div id="servers"></div>
+          <div class="row">
+            <input id="customWisp" placeholder="wss://your-wisp-server.com/wisp/">
+            <button class="btn primary" id="addWisp">Add</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-extensions">
+        <div class="card">
+          <h2>JavaScript extensions</h2>
+          <p class="desc">Create scripts and run them on demand or automatically by domain/path.</p>
+          <div id="extensions"></div>
+        </div>
+        <div class="card">
+          <h2>Add extension</h2>
+          <div class="row" style="margin-bottom:10px;">
+            <input id="extName" placeholder="Extension name">
+          </div>
+          <textarea id="extCode" placeholder="// JavaScript to run in page context"></textarea>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn primary" id="saveExt">Save extension</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const THEMES = ['dark', 'light', 'graphite', 'forest', 'sunset'];
+    const WISP_SERVERS = [
+      { name: "DaydreamX's Wisp", url: "wss://dash.goip.de/wisp/" },
+      { name: "Space's Wisp", url: "wss://register.goip.it/wisp/" },
+      { name: "Rhw's Wisp", url: "wss://wisp.rhw.one/wisp/" }
+    ];
+    const WISP_PROTOCOLS = new Set(['ws:', 'wss:']);
+    const EXTENSIONS_KEY = 'customExtensions';
+
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+    function getStoredWisps() {
+      try { return JSON.parse(localStorage.getItem('customWisps') || '[]'); } catch { return []; }
+    }
+    function normalizeWispUrl(value) {
+      const trimmed = value.trim();
+      if (!trimmed) return '';
+      try {
+        const url = new URL(trimmed);
+        if (!WISP_PROTOCOLS.has(url.protocol)) return '';
+        return url.href;
+      } catch { return ''; }
+    }
+    function getStoredExtensions() {
+      try { return JSON.parse(localStorage.getItem(EXTENSIONS_KEY) || '[]'); } catch { return []; }
+    }
+    function setStoredExtensions(exts) {
+      localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(exts));
+      window.parent?.postMessage({ type: 'extensionsUpdated' }, '*');
+    }
+
+    function setTheme(theme) {
+      const nextTheme = THEMES.includes(theme) ? theme : 'dark';
+      document.documentElement.dataset.theme = nextTheme;
+      localStorage.setItem('theme', nextTheme);
+      $$('.theme-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.theme === nextTheme));
+      window.parent?.postMessage({ type: 'setTheme', theme: nextTheme }, '*');
+    }
+
+    function renderThemes() {
+      const wrap = $('#themes');
+      wrap.innerHTML = '';
+      THEMES.forEach((theme) => {
+        const b = document.createElement('button');
+        b.className = 'theme-btn';
+        b.dataset.theme = theme;
+        b.textContent = theme[0].toUpperCase() + theme.slice(1);
+        b.onclick = () => setTheme(theme);
+        wrap.appendChild(b);
+      });
+      const current = localStorage.getItem('theme') || 'dark';
+      setTheme(current);
+    }
+
+    function renderServers() {
+      const current = localStorage.getItem('proxServer') || WISP_SERVERS[0].url;
+      const all = [...WISP_SERVERS, ...getStoredWisps()];
+      const container = $('#servers');
+      container.innerHTML = '';
+      all.forEach((server, i) => {
+        const row = document.createElement('div');
+        row.className = `server-item ${server.url === current ? 'active' : ''}`;
+        row.innerHTML = `<div><div>${server.name}</div><div class="muted">${server.url}</div></div>`;
+        const actions = document.createElement('div');
+        const use = document.createElement('button');
+        use.className = 'btn';
+        use.textContent = 'Use';
+        use.onclick = () => {
+          localStorage.setItem('proxServer', server.url);
+          window.parent?.postMessage({ type: 'setWisp', url: server.url }, '*');
+          renderServers();
+        };
+        actions.appendChild(use);
+        if (i >= WISP_SERVERS.length) {
+          const del = document.createElement('button');
+          del.className = 'btn';
+          del.textContent = 'Remove';
+          del.onclick = () => {
+            const updated = getStoredWisps().filter(w => w.url !== server.url);
+            localStorage.setItem('customWisps', JSON.stringify(updated));
+            renderServers();
+          };
+          actions.appendChild(del);
+        }
+        row.appendChild(actions);
+        container.appendChild(row);
+      });
+    }
+
+    function renderExtensions() {
+      const list = $('#extensions');
+      const exts = getStoredExtensions();
+      list.innerHTML = '';
+      if (exts.length === 0) {
+        list.innerHTML = '<div class="muted">No extensions created yet.</div>';
+        return;
+      }
+      exts.forEach((ext) => {
+        const el = document.createElement('div');
+        el.className = 'extension-item';
+        const rules = (ext.rules || []).map(rule => `<div class="rule">${rule.domain}${rule.includeSubpaths ? ' (all paths)' : rule.path}</div>`).join('') || '<div class="rule">No autorun rules</div>';
+        el.innerHTML = `<div><strong>${ext.name}</strong><div class="rules">${rules}</div></div>`;
+        const actions = document.createElement('div');
+        const del = document.createElement('button');
+        del.className = 'btn';
+        del.textContent = 'Delete';
+        del.onclick = () => {
+          setStoredExtensions(exts.filter(item => item.id !== ext.id));
+          renderExtensions();
+        };
+        actions.appendChild(del);
+        el.appendChild(actions);
+        list.appendChild(el);
+      });
+    }
+
+    $('#addWisp').onclick = () => {
+      const normalized = normalizeWispUrl($('#customWisp').value);
+      if (!normalized) return;
+      const custom = getStoredWisps();
+      if (custom.some(w => w.url === normalized) || WISP_SERVERS.some(w => w.url === normalized)) return;
+      custom.push({ name: `Custom ${custom.length + 1}`, url: normalized });
+      localStorage.setItem('customWisps', JSON.stringify(custom));
+      $('#customWisp').value = '';
+      renderServers();
+    };
+
+    $('#saveExt').onclick = () => {
+      const name = $('#extName').value.trim();
+      const code = $('#extCode').value;
+      if (!name || !code.trim()) return;
+      const exts = getStoredExtensions();
+      exts.push({ id: crypto.randomUUID(), name, code, rules: [] });
+      setStoredExtensions(exts);
+      $('#extName').value = '';
+      $('#extCode').value = '';
+      renderExtensions();
+    };
+
+    $$('.nav-item').forEach((btn) => {
+      btn.onclick = () => {
+        const page = btn.dataset.page;
+        $$('.nav-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        $$('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+      };
+    });
+
+    renderThemes();
+    renderServers();
+    renderExtensions();
+  </script>
+</body>
+
+</html>
