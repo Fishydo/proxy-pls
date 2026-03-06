@@ -170,7 +170,11 @@ function openHome() {
 }
 
 function openSettings() {
-    handleSubmit("settings.html");
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    tab.frame.frame.src = "settings.html";
+    document.getElementById("address-bar").value = "settings.html";
 }
 
 function toggleTheme() {
