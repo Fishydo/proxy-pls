@@ -133,7 +133,6 @@ scramjet.addEventListener("request", async (e) => {
                 });
             } catch (err) {
                 lastErr = err;
-                const errMsg = String(err?.message || err).toLowerCase();
                 const isRetryable = RETRYABLE_ERRORS.some((message) => errMsg.includes(message));
 
                 if (!isRetryable || i === MAX_RETRIES || e.method !== 'GET') break;

@@ -7,24 +7,21 @@ const WISP_SERVERS = [
     { name: "Space's Wisp", url: "wss://register.goip.it/wisp/" },
     { name: "Rhw's Wisp", url: "wss://wisp.rhw.one/wisp/" }
 ];
+
 const SEARCH_URL = "https://search.brave.com/search?q=";
-const EXTENSIONS_KEY = "customExtensions";
-const INTERNAL_PROTOCOL = "lcc://";
-const THEMES = ["dark", "light", "graphite", "forest", "sunset"];
-const INTERNAL_PAGES = {
-    settings: "settings",
-    newtab: "newtab"
-};
 
 if (!localStorage.getItem("proxServer")) {
     localStorage.setItem("proxServer", DEFAULT_WISP);
 }
 
+let wispUrl = localStorage.getItem("proxServer") || DEFAULT_WISP;
+
+
 // =====================================================
 // BROWSER STATE
 // =====================================================
 if (typeof BareMux === 'undefined') {
-    BareMux = { BareMuxConnection: class { constructor() { } setTransport() { } } };
+    BareMux = { BareMuxConnection: class { constructor() {} setTransport() {} } };
 }
 
 let scramjet;
@@ -32,52 +29,15 @@ let tabs = [];
 let activeTabId = null;
 let nextTabId = 1;
 
-function getAllWispCandidates(preferred) {
-    const custom = getStoredWisps();
-    const pool = [...WISP_SERVERS, ...custom].map((item) => item.url);
-    const deduped = [...new Set([preferred, ...pool].filter(Boolean))];
-    return deduped;
-}
-
-function probeWisp(url, timeoutMs = 2500) {
-    return new Promise((resolve) => {
-        try {
-            const socket = new WebSocket(url);
-            const timeout = setTimeout(() => {
-                try { socket.close(); } catch { }
-                resolve(false);
-            }, timeoutMs);
-
-            socket.onopen = () => {
-                clearTimeout(timeout);
-                try { socket.close(); } catch { }
-                resolve(true);
-            };
-
-            socket.onerror = () => {
-                clearTimeout(timeout);
-                resolve(false);
-            };
-        } catch {
-            resolve(false);
-        }
-    });
-}
-
-async function resolveWorkingWisp(preferred) {
-    const candidates = getAllWispCandidates(preferred);
-    for (const candidate of candidates) {
-        if (await probeWisp(candidate)) return candidate;
-    }
-    return preferred || DEFAULT_WISP;
-}
 
 // =====================================================
 // INITIALIZATION
 // =====================================================
 document.addEventListener('DOMContentLoaded', async function () {
+
     let basePath = location.pathname.replace(/[^/]*$/, '');
     if (!basePath.endsWith('/')) basePath += '/';
+
     const { ScramjetController } = $scramjetLoadController();
 
     scramjet = new ScramjetController({
@@ -90,718 +50,264 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     try {
+
         await scramjet.init();
 
         if ('serviceWorker' in navigator) {
+
             const reg = await navigator.serviceWorker.register(basePath + 'sw.js', { scope: basePath });
             await navigator.serviceWorker.ready;
-            const preferredWisp = localStorage.getItem("proxServer") || DEFAULT_WISP;
-            const wispUrl = await resolveWorkingWisp(preferredWisp);
-            if (wispUrl !== preferredWisp) {
-                localStorage.setItem("proxServer", wispUrl);
-                console.warn(`Preferred Wisp unavailable, switched to: ${wispUrl}`);
-            }
 
-            // Try to send to both active registration and controller to be safe
-            const sw = reg.active || navigator.serviceWorker.controller;
-            if (sw) {
-                console.log("Sending config to SW:", wispUrl);
-                sw.postMessage({ type: "config", wispurl: wispUrl, wispCandidates: getAllWispCandidates(wispUrl) });
-            }
-
-            // Ensure controller also gets it if different
-            if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== sw) {
-                navigator.serviceWorker.controller.postMessage({ type: "config", wispurl: wispUrl, wispCandidates: getAllWispCandidates(wispUrl) });
-            }
-
-            // Force update to get new SW code if available
             reg.update();
 
             const connection = new BareMux.BareMuxConnection(basePath + "bareworker.js");
-            await connection.setTransport("https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport/dist/index.mjs", [{ wisp: wispUrl }]);
+
+            await connection.setTransport(
+                "https://cdn.jsdelivr.net/npm/@mercuryworkshop/epoxy-transport@2.1.28/dist/index.mjs",
+                [{ wisp: wispUrl }]
+            );
         }
 
         await initializeBrowser();
+
     } catch (error) {
+
         console.error("Failed to initialize proxy UI:", error);
-        showErrorMessage("Failed to initialize proxy. Please reload or try another Wisp server.");
+
+        showErrorMessage("Failed to initialize proxy. Reload or change Wisp.");
+
     }
+
 });
+
 
 // =====================================================
 // BROWSER UI
 // =====================================================
 async function initializeBrowser() {
+
     const root = document.getElementById("app");
+
     if (!root) {
         console.error("App container missing.");
         return;
     }
+
     root.innerHTML = `
-        <div class="browser-container chrome-ui">
-            <div class="tab-strip">
-                <div class="tab-strip-left">
-                    <div class="tabs" id="tabs-container"></div>
-                </div>
-                <div class="tab-strip-right">
-                    <button class="tab-action tab-action-new" id="new-tab-btn" title="New Tab">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="toolbar">
-                <div class="nav-controls">
-                    <button id="back-btn" title="Back"><i class="fa-solid fa-chevron-left"></i></button>
-                    <button id="fwd-btn" title="Forward"><i class="fa-solid fa-chevron-right"></i></button>
-                    <button id="reload-btn" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
-                    <button id="home-btn-nav" title="Home"><i class="fa-solid fa-house"></i></button>
-                </div>
-                <div class="address-wrapper">
-                    <div class="security-indicator" id="security-indicator">
-                        <i class="fa-solid fa-lock"></i>
-                    </div>
-                    <input class="bar" id="address-bar" autocomplete="off" placeholder="Search Google or type a URL">
-                    <div class="omnibox-actions">
-                        <button class="omnibox-btn" id="extensions-btn" title="Extensions"><i class="fa-solid fa-puzzle-piece"></i></button>
-                        <button class="omnibox-btn" id="theme-toggle" title="Cycle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
-                    </div>
-                </div>
-                <div class="toolbar-actions">
-                    <button id="devtools-btn" title="DevTools"><i class="fa-solid fa-code"></i></button>
-                    <button id="wisp-settings-btn" title="Proxy Settings"><i class="fa-solid fa-gear"></i></button>
-                </div>
-            </div>
-            <div class="loading-bar-container"><div class="loading-bar" id="loading-bar"></div></div>
-            <div class="iframe-container" id="iframe-container">
-                <div id="loading" class="message-container" style="display: none;">
-                    <div class="message-content">
-                        <div class="spinner"></div>
-                        <h1 id="loading-title">Connecting</h1>
-                        <p id="loading-url">Initializing proxy...</p>
-                        <button id="skip-btn">Skip</button>
-                    </div>
-                </div>
-                <div id="error" class="message-container" style="display: none;">
-                    <div class="message-content">
-                        <h1>Connection Error</h1>
-                        <p id="error-message">An error occurred.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="extensions-menu hidden" id="extensions-menu">
-                <div class="extensions-header">Extensions</div>
-                <div id="extensions-list"></div>
-                <div class="extensions-empty" id="extensions-empty">No extensions configured.</div>
-            </div>
-        </div>`;
+
+<div class="browser-container chrome-ui">
+
+<div class="tab-strip">
+
+<div class="tab-strip-left">
+<div class="tabs" id="tabs-container"></div>
+</div>
+
+<div class="tab-strip-right">
+<button class="tab-action tab-action-new" id="new-tab-btn">
+<i class="fa-solid fa-plus"></i>
+</button>
+</div>
+
+</div>
+
+<div class="toolbar">
+
+<div class="nav-controls">
+<button id="back-btn"><i class="fa-solid fa-chevron-left"></i></button>
+<button id="fwd-btn"><i class="fa-solid fa-chevron-right"></i></button>
+<button id="reload-btn"><i class="fa-solid fa-rotate-right"></i></button>
+<button id="home-btn-nav"><i class="fa-solid fa-house"></i></button>
+</div>
+
+<div class="address-wrapper">
+
+<div class="security-indicator">
+<i class="fa-solid fa-lock"></i>
+</div>
+
+<input id="address-bar" autocomplete="off" placeholder="Search or type URL">
+
+<div class="omnibox-actions">
+
+<button id="extensions-btn">
+<i class="fa-solid fa-puzzle-piece"></i>
+</button>
+
+<button id="theme-toggle">
+<i class="fa-solid fa-circle-half-stroke"></i>
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="loading-bar-container">
+<div class="loading-bar" id="loading-bar"></div>
+</div>
+
+<div class="iframe-container" id="iframe-container"></div>
+
+<div class="extensions-menu hidden" id="extensions-menu">
+<div class="extensions-header">Extensions</div>
+<div id="extensions-list"></div>
+<div id="extensions-empty">No extensions</div>
+</div>
+
+</div>
+`;
 
     document.getElementById('back-btn').onclick = () => getActiveTab()?.frame.back();
     document.getElementById('fwd-btn').onclick = () => getActiveTab()?.frame.forward();
     document.getElementById('reload-btn').onclick = () => getActiveTab()?.frame.reload();
-    document.getElementById('home-btn-nav').onclick = () => window.location.href = '../index.html';
-    document.getElementById('devtools-btn').onclick = toggleDevTools;
-    document.getElementById('wisp-settings-btn').onclick = openSettings;
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) themeToggle.onclick = toggleTheme;
-    const extensionsBtn = document.getElementById('extensions-btn');
-    const extensionsMenu = document.getElementById('extensions-menu');
-    if (extensionsBtn && extensionsMenu) {
-        extensionsBtn.onclick = (e) => {
-            e.stopPropagation();
-            extensionsMenu.classList.toggle('hidden');
-            renderExtensionsMenu();
-        };
-        document.addEventListener('click', (event) => {
-            if (!extensionsMenu.contains(event.target) && event.target !== extensionsBtn) {
-                extensionsMenu.classList.add('hidden');
-            }
-        });
-    }
 
-    // Skip button logic
-    const skipBtn = document.getElementById('skip-btn');
-    if (skipBtn) {
-        skipBtn.onclick = () => {
-            const tab = getActiveTab();
-            if (tab) {
-                tab.loading = false;
-                showIframeLoading(false);
-            }
-        };
-    }
+    const addrBar = document.getElementById("address-bar");
 
-    const addrBar = document.getElementById('address-bar');
-    if (addrBar) {
-        addrBar.onkeyup = (e) => { if (e.key === 'Enter') handleSubmit(); };
-        addrBar.onfocus = () => addrBar.select();
-    }
+    addrBar.onkeyup = (e) => {
+        if (e.key === "Enter") handleSubmit();
+    };
 
-    window.addEventListener('message', (e) => {
-        if (e.data?.type === 'navigate') {
-            handleSubmit(e.data.url);
-            return;
-        }
-        if (e.data?.type === 'setWisp' && e.data.url) {
-            setWisp(e.data.url);
-            return;
-        }
-        if (e.data?.type === 'setTheme' && e.data.theme) {
-            setTheme(e.data.theme);
-            return;
-        }
-        if (e.data?.type === 'extensionsUpdated') {
-            renderExtensionsMenu();
-        }
-    });
+    document.getElementById("new-tab-btn").onclick = () => createTab(true);
 
-    const newTabButton = document.getElementById('new-tab-btn');
-    if (newTabButton) newTabButton.onclick = () => createTab(true);
-    window.addEventListener('resize', updateTabsUI);
+    window.addEventListener("resize", updateTabsUI);
+
     createTab(true);
-    applyStoredTheme();
-    checkHashParameters();
+
 }
+
 
 // =====================================================
 // TAB MANAGEMENT
 // =====================================================
 function createTab(makeActive = true) {
+
     const frame = scramjet.createFrame();
+
     const tab = {
         id: nextTabId++,
         title: "New Tab",
-        url: "NT.html",
+        url: "",
         frame: frame,
         loading: false,
         favicon: null,
-        skipTimeout: null,
-        showSkip: false,
         navCount: 0
     };
 
     frame.frame.src = "NT.html";
 
-    frame.addEventListener("urlchange", (e) => {
-        tab.url = e.url;
-        tab.loading = true;
-        tab.showSkip = false;
-        tab.navCount += 1;
+    frame.frame.addEventListener("load", () => {
 
-        // Show loading screen immediately if this is the active tab
-        if (tab.id === activeTabId) {
-            showIframeLoading(true, tab.url);
-        }
-
-        if (e.url.includes('NT.html')) {
-            tab.title = "New Tab";
-            tab.url = "";
-            tab.favicon = null;
-        } else {
-            try {
-                const urlObj = new URL(e.url);
-                tab.title = urlObj.hostname;
-                tab.favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-            } catch {
-                tab.title = "Browsing";
-                tab.favicon = null;
-            }
-        }
-        updateTabsUI();
-        updateAddressBar();
-        updateLoadingBar(tab, 10);
-        renderExtensionsMenu();
-
-        // Set timeout to show skip button
-        if (tab.skipTimeout) clearTimeout(tab.skipTimeout);
-        tab.skipTimeout = setTimeout(() => {
-            if (tab.loading && tab.id === activeTabId) {
-                const skipBtn = document.getElementById('skip-btn');
-                if (skipBtn) {
-                    skipBtn.style.display = 'inline-block';
-                    tab.showSkip = true;
-                }
-            }
-        }, 1000); // 1 second before skip button appears
-    });
-
-    frame.frame.addEventListener('load', () => {
         tab.loading = false;
-        tab.showSkip = false;
-        if (tab.skipTimeout) clearTimeout(tab.skipTimeout);
-
-        if (tab.id === activeTabId) {
-            showIframeLoading(false);
-        }
 
         try {
-            const title = frame.frame.contentWindow.document.title;
-            if (title) tab.title = title;
-        } catch { }
 
-        if (frame.frame.contentWindow.location.href.includes('NT.html')) {
-            tab.title = "New Tab";
-            tab.url = "";
-            tab.favicon = null;
-        }
+            const title = frame.frame.contentWindow.document.title;
+
+            if (title) tab.title = title;
+
+        } catch {}
 
         updateTabsUI();
-        updateAddressBar();
-        updateLoadingBar(tab, 100);
-        maybeRunExtensionsForTab(tab, tab.url);
-        renderExtensionsMenu();
+
     });
 
     tabs.push(tab);
+
     document.getElementById("iframe-container").appendChild(frame.frame);
+
     if (makeActive) switchTab(tab.id);
-    return tab;
+
 }
 
-function showIframeLoading(show, url = '') {
-    const loader = document.getElementById("loading");
-    const title = document.getElementById("loading-title");
-    const urlText = document.getElementById("loading-url");
-    const skipBtn = document.getElementById("skip-btn");
 
-    if (loader) {
-        loader.style.display = show ? "flex" : "none";
-        const tab = getActiveTab();
-        if (tab) {
-            tab.frame.frame.classList.toggle('loading', show);
-        }
-        if (show) {
-            title.textContent = "Connecting";
-            urlText.textContent = url || "Loading content...";
-            if (skipBtn) skipBtn.style.display = 'none'; // Reset skip button visibility
-        } else if (skipBtn) {
-            skipBtn.style.display = 'none';
-        }
-    }
-}
+function switchTab(id) {
 
-function switchTab(tabId) {
-    activeTabId = tabId;
-    const tab = getActiveTab();
+    activeTabId = id;
 
-    tabs.forEach(t => t.frame.frame.classList.toggle("hidden", t.id !== tabId));
-
-    // Update loading state for accessibiltiy
-    if (tab) {
-        showIframeLoading(tab.loading, tab.url);
-        const skipBtn = document.getElementById('skip-btn');
-        if (tab.loading && skipBtn) {
-            skipBtn.style.display = tab.showSkip ? 'inline-block' : 'none';
-        }
-    }
+    tabs.forEach(t => {
+        t.frame.frame.classList.toggle("hidden", t.id !== id);
+    });
 
     updateTabsUI();
-    updateAddressBar();
 }
 
-function closeTab(tabId) {
-    const idx = tabs.findIndex(t => t.id === tabId);
+
+function closeTab(id) {
+
+    const idx = tabs.findIndex(t => t.id === id);
+
     if (idx === -1) return;
 
-    if (tabs[idx].skipTimeout) clearTimeout(tabs[idx].skipTimeout);
     tabs[idx].frame.frame.remove();
-    tabs.splice(idx, 1);
 
-    if (activeTabId === tabId) {
-        if (tabs.length > 0) switchTab(tabs[Math.max(0, idx - 1)].id);
-        else createTab(true);
-    } else {
-        updateTabsUI();
-    }
+    tabs.splice(idx,1);
+
+    if (tabs.length === 0) createTab(true);
+    else switchTab(tabs[Math.max(0, idx-1)].id);
+
 }
 
+
 function updateTabsUI() {
+
     const container = document.getElementById("tabs-container");
-    if (!container) return;
+
     container.innerHTML = "";
 
     tabs.forEach(tab => {
+
         const el = document.createElement("div");
+
         el.className = `tab ${tab.id === activeTabId ? "active" : ""}`;
 
-        let iconHtml;
-        if (tab.loading) {
-            iconHtml = `<div class="tab-spinner"></div>`;
-        } else if (tab.favicon) {
-            iconHtml = `<img src="${tab.favicon}" class="tab-favicon" onerror="this.style.display='none'">`;
-        } else {
-            iconHtml = ``;
-        }
-
         el.innerHTML = `
-            ${iconHtml}
-            <span class="tab-title">${tab.title}</span>
-            <span class="tab-close">&times;</span>
-        `;
+<span class="tab-title">${tab.title}</span>
+<span class="tab-close">&times;</span>
+`;
 
         el.onclick = () => switchTab(tab.id);
-        el.querySelector(".tab-close").onclick = (e) => { e.stopPropagation(); closeTab(tab.id); };
+
+        el.querySelector(".tab-close").onclick = (e)=>{
+            e.stopPropagation();
+            closeTab(tab.id);
+        };
+
         container.appendChild(el);
+
     });
 
-    const availableWidth = container.getBoundingClientRect().width || 0;
-    const tabCount = Math.max(tabs.length, 1);
-    const maxWidth = 220;
-    const minWidth = 120;
-    const gap = 6;
-    const targetWidth = Math.floor((availableWidth - gap * tabCount) / tabCount);
-    const tabWidth = Math.max(minWidth, Math.min(maxWidth, targetWidth));
-    container.style.setProperty('--tab-size', `${tabWidth}px`);
 }
 
-function updateAddressBar() {
-    const bar = document.getElementById("address-bar");
-    const tab = getActiveTab();
-    if (bar && tab) {
-        if (!tab.url || tab.url.includes("NT.html") || tab.url === `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`) {
-            bar.value = "";
-            return;
-        }
-        bar.value = tab.url;
-    }
+
+// =====================================================
+// NAVIGATION
+// =====================================================
+function getActiveTab(){
+    return tabs.find(t => t.id === activeTabId);
 }
 
-function getActiveTab() { return tabs.find(t => t.id === activeTabId); }
+function handleSubmit(url){
 
-function handleSubmit(url) {
     const tab = getActiveTab();
-    if (!tab) return;
+    if(!tab) return;
+
     const bar = document.getElementById("address-bar");
-    let input = url || bar?.value.trim();
-    if (!input) return;
 
-    if (input.startsWith(INTERNAL_PROTOCOL)) {
-        handleInternalUrl(input, tab);
-        return;
+    let input = url || bar.value.trim();
+
+    if(!input) return;
+
+    if(!input.startsWith("http")){
+
+        if(input.includes("."))
+            input = "https://" + input;
+        else
+            input = SEARCH_URL + encodeURIComponent(input);
+
     }
 
-    if (!input.startsWith('http')) {
-        if (input.includes('.') && !input.includes(' ')) input = 'https://' + input;
-        else input = SEARCH_URL + encodeURIComponent(input);
-    }
     tab.frame.go(input);
-}
 
-function getStoredExtensions() {
-    try { return JSON.parse(localStorage.getItem(EXTENSIONS_KEY) || '[]'); }
-    catch { return []; }
-}
-
-function setStoredExtensions(extensions) {
-    localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
-}
-
-function decodePossibleTargetUrl(rawUrl) {
-    if (!rawUrl) return rawUrl;
-    const direct = rawUrl.match(/https?:\/\/.+$/i);
-    if (direct) return direct[0];
-
-    const encodedMatch = rawUrl.match(/https?%3A%2F%2F[^&]+/i);
-    if (encodedMatch) {
-        try { return decodeURIComponent(encodedMatch[0]); } catch { }
-    }
-
-    const paramMatch = rawUrl.match(/[?&](url|target|dest)=([^&]+)/i);
-    if (paramMatch) {
-        try { return decodeURIComponent(paramMatch[2]); } catch { }
-    }
-
-    return rawUrl;
-}
-
-function normalizeRulePath(pathname) {
-    if (!pathname) return '/';
-    const normalized = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
-    return normalized || '/';
-}
-
-function getLastRanMap() {
-    if (!window.__extLastRun) window.__extLastRun = new Map();
-    return window.__extLastRun;
-}
-
-
-function getUrlRuleInfo(rawUrl) {
-    try {
-        const parsed = new URL(decodePossibleTargetUrl(rawUrl));
-        return {
-            domain: parsed.hostname.toLowerCase(),
-            path: normalizeRulePath(parsed.pathname || '/'),
-            full: parsed.href
-        };
-    } catch {
-        return null;
-    }
-}
-
-function getActiveRuleInfo() {
-    const tab = getActiveTab();
-    if (!tab || !tab.url || tab.url.startsWith(INTERNAL_PROTOCOL) || tab.url.includes('NT.html')) return null;
-    return getUrlRuleInfo(tab.url);
-}
-
-function runExtensionCode(extension, tab) {
-    try {
-        const win = tab?.frame?.frame?.contentWindow;
-        if (!win || !extension?.code) return;
-
-        try {
-            win.eval(extension.code);
-            return;
-        } catch { }
-
-        try {
-            const runner = new win.Function(extension.code);
-            runner();
-            return;
-        } catch { }
-
-        const script = win.document.createElement('script');
-        script.textContent = extension.code;
-        (win.document.head || win.document.documentElement || win.document.body).appendChild(script);
-        script.remove();
-    } catch (error) {
-        console.warn(`Extension '${extension?.name || 'Unknown'}' failed:`, error);
-    }
-}
-
-function shouldRunExtensionOnUrl(extension, rawUrl) {
-    const info = getUrlRuleInfo(rawUrl);
-    if (!info || !Array.isArray(extension.rules)) return false;
-    return extension.rules.some((rule) => {
-        if (!rule.autoRun || rule.domain !== info.domain) return false;
-        if (rule.includeSubpaths) return true;
-        return normalizeRulePath(rule.path) === info.path;
-    });
-}
-
-function maybeRunExtensionsForTab(tab, rawUrl) {
-    if (!rawUrl || rawUrl.startsWith(INTERNAL_PROTOCOL) || rawUrl.includes('NT.html')) return;
-    const info = getUrlRuleInfo(rawUrl);
-    if (!info) return;
-    const lastRan = getLastRanMap();
-    const extensions = getStoredExtensions();
-    extensions.forEach((extension) => {
-        if (shouldRunExtensionOnUrl(extension, rawUrl)) {
-            const runKey = `${extension.id}:${tab?.id || 0}:${tab?.navCount || 0}:${info.domain}${info.path}`;
-            if (lastRan.get(runKey)) return;
-            runExtensionCode(extension, tab);
-            lastRan.set(runKey, Date.now());
-        }
-    });
-}
-
-function toggleExtensionRule(extensionId, options) {
-    const info = getActiveRuleInfo();
-    if (!info) return;
-    const extensions = getStoredExtensions();
-    const extension = extensions.find((ext) => ext.id === extensionId);
-    if (!extension) return;
-
-    extension.rules = extension.rules || [];
-    let rule = extension.rules.find((entry) => entry.domain === info.domain && entry.path === info.path);
-
-    if (!rule) {
-        rule = {
-            domain: info.domain,
-            path: normalizeRulePath(info.path),
-            includeSubpaths: false,
-            autoRun: false
-        };
-        extension.rules.push(rule);
-    }
-
-    if (typeof options.autoRun === 'boolean') rule.autoRun = options.autoRun;
-    if (typeof options.includeSubpaths === 'boolean') rule.includeSubpaths = options.includeSubpaths;
-
-    if (!rule.autoRun) {
-        extension.rules = extension.rules.filter((entry) => !(entry.domain === rule.domain && entry.path === rule.path));
-    }
-
-    setStoredExtensions(extensions);
-    renderExtensionsMenu();
-}
-
-function removeExtension(extensionId) {
-    const extensions = getStoredExtensions().filter((ext) => ext.id !== extensionId);
-    setStoredExtensions(extensions);
-    renderExtensionsMenu();
-}
-
-function renderExtensionsMenu() {
-    const list = document.getElementById('extensions-list');
-    const empty = document.getElementById('extensions-empty');
-    if (!list || !empty) return;
-
-    const extensions = getStoredExtensions();
-    const info = getActiveRuleInfo();
-    list.innerHTML = '';
-
-    if (extensions.length === 0) {
-        empty.style.display = 'block';
-        return;
-    }
-
-    empty.style.display = 'none';
-
-    extensions.forEach((extension) => {
-        const rule = info ? (extension.rules || []).find((entry) => entry.domain === info.domain && entry.path === info.path) : null;
-        const row = document.createElement('div');
-        row.className = 'extension-item';
-        row.innerHTML = `
-            <div class="extension-item-head">
-                <strong>${extension.name}</strong>
-                <div class="extension-actions">
-                    <button class="mini-btn run-now">Run</button>
-                    <button class="mini-btn remove">Remove</button>
-                </div>
-            </div>
-            <label class="extension-toggle"><input type="checkbox" class="auto-run" ${rule?.autoRun ? 'checked' : ''}> Run on this page automatically</label>
-            <label class="extension-toggle"><input type="checkbox" class="all-paths" ${rule?.includeSubpaths ? 'checked' : ''} ${rule?.autoRun ? '' : 'disabled'}> Run on all paths for this domain</label>
-        `;
-
-        row.querySelector('.run-now')?.addEventListener('click', () => {
-            const tab = getActiveTab();
-            if (tab) runExtensionCode(extension, tab);
-        });
-        row.querySelector('.remove')?.addEventListener('click', () => removeExtension(extension.id));
-        row.querySelector('.auto-run')?.addEventListener('change', (event) => {
-            toggleExtensionRule(extension.id, { autoRun: event.target.checked });
-        });
-        row.querySelector('.all-paths')?.addEventListener('change', (event) => {
-            toggleExtensionRule(extension.id, { includeSubpaths: event.target.checked, autoRun: true });
-        });
-
-        list.appendChild(row);
-    });
-}
-
-function updateLoadingBar(tab, percent) {
-    if (tab.id !== activeTabId) return;
-    const bar = document.getElementById("loading-bar");
-    if (!bar) return;
-    bar.style.width = percent + "%";
-    bar.style.opacity = percent === 100 ? "0" : "1";
-    if (percent === 100) setTimeout(() => { bar.style.width = "0%"; }, 200);
-}
-
-// =====================================================
-// SETTINGS & WISP
-// =====================================================
-function openSettings() {
-    const tab = getActiveTab();
-    if (!tab) return;
-    handleInternalUrl(`${INTERNAL_PROTOCOL}${INTERNAL_PAGES.settings}`, tab);
-}
-
-function getStoredWisps() {
-    try { return JSON.parse(localStorage.getItem('customWisps') || '[]'); }
-    catch { return []; }
-}
-
-function setWisp(url) {
-    const oldUrl = localStorage.getItem('proxServer');
-    if (oldUrl === url) return;
-    localStorage.setItem('proxServer', url);
-
-    // Show notification before reload
-    if (typeof Notify !== 'undefined' && oldUrl !== url) {
-        const serverName = [...WISP_SERVERS, ...getStoredWisps()].find(s => s.url === url)?.name || 'Custom Server';
-        Notify.success('Proxy Changed', `Switching to ${serverName}...`);
-    }
-
-    if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'config', wispurl: url, wispCandidates: getAllWispCandidates(url) });
-    }
-
-    // Small delay to show notification
-    setTimeout(() => location.reload(), 600);
-}
-
-// =====================================================
-// UTILITIES
-// =====================================================
-function toggleDevTools() {
-    const win = getActiveTab()?.frame.frame.contentWindow;
-    if (!win) return;
-    if (win.eruda) {
-        win.eruda.show();
-        return;
-    }
-    const script = win.document.createElement('script');
-    script.src = "https://cdn.jsdelivr.net/npm/eruda";
-    script.onload = () => { win.eruda.init(); win.eruda.show(); };
-    win.document.body.appendChild(script);
-}
-
-async function checkHashParameters() {
-    if (window.location.hash) {
-        const hash = decodeURIComponent(window.location.hash.substring(1));
-        if (hash) handleSubmit(hash);
-        history.replaceState(null, null, location.pathname);
-    }
-}
-
-function showErrorMessage(message) {
-    const errorEl = document.getElementById("error");
-    const errorMessage = document.getElementById("error-message");
-    if (!errorEl || !errorMessage) return;
-    errorMessage.textContent = message;
-    errorEl.style.display = "flex";
-    showIframeLoading(false);
-}
-
-function handleInternalUrl(input, tab) {
-    const page = input.replace(INTERNAL_PROTOCOL, '').toLowerCase();
-    if (page === INTERNAL_PAGES.settings) {
-        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.settings}`;
-        tab.title = "Settings";
-        tab.favicon = null;
-        tab.loading = false;
-        tab.frame.frame.src = "settings.html";
-        updateTabsUI();
-        updateAddressBar();
-        showIframeLoading(false);
-        return;
-    }
-
-    if (page === INTERNAL_PAGES.newtab) {
-        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`;
-        tab.title = "New Tab";
-        tab.favicon = null;
-        tab.loading = false;
-        tab.frame.frame.src = "NT.html";
-        updateTabsUI();
-        updateAddressBar();
-        showIframeLoading(false);
-        return;
-    }
-
-    showErrorMessage("Unknown internal page.");
-}
-
-function applyStoredTheme() {
-    const theme = localStorage.getItem('theme') || 'dark';
-    setTheme(theme);
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.dataset.theme || 'dark';
-    const index = THEMES.indexOf(currentTheme);
-    const nextTheme = THEMES[(index + 1) % THEMES.length] || 'dark';
-    setTheme(nextTheme);
-}
-
-function setTheme(theme) {
-    const nextTheme = THEMES.includes(theme) ? theme : 'dark';
-    document.documentElement.dataset.theme = nextTheme;
-    localStorage.setItem('theme', nextTheme);
-    const themeButtons = document.querySelectorAll('.theme-btn');
-    themeButtons.forEach((button) => {
-        button.classList.toggle('active', button.dataset.theme === nextTheme);
-    });
 }
