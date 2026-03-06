@@ -95,14 +95,6 @@ async function initializeBrowser() {
                         <i class="fa-solid fa-plus"></i>
                     </button>
                 </div>
-                <div class="tab-strip-right">
-                    <button class="window-control" title="Profile">
-                        <i class="fa-solid fa-user"></i>
-                    </button>
-                    <button class="window-control" id="menu-btn" title="Customize and control">
-                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                </div>
             </div>
             <div class="toolbar">
                 <div class="nav-controls">
@@ -117,20 +109,12 @@ async function initializeBrowser() {
                     </div>
                     <input class="bar" id="address-bar" autocomplete="off" placeholder="Search Google or type a URL">
                     <div class="omnibox-actions">
-                        <button class="omnibox-btn" title="Bookmark"><i class="fa-regular fa-star"></i></button>
-                        <button class="omnibox-btn" title="Extensions"><i class="fa-solid fa-puzzle-piece"></i></button>
                     </div>
                 </div>
                 <div class="toolbar-actions">
                     <button id="devtools-btn" title="DevTools"><i class="fa-solid fa-code"></i></button>
                     <button id="wisp-settings-btn" title="Proxy Settings"><i class="fa-solid fa-gear"></i></button>
                 </div>
-            </div>
-            <div class="bookmarks-bar" id="bookmarks-bar">
-                <button class="bookmark-item"><i class="fa-solid fa-star"></i> Getting Started</button>
-                <button class="bookmark-item">Docs</button>
-                <button class="bookmark-item">News</button>
-                <button class="bookmark-item">Design</button>
             </div>
             <div class="loading-bar-container"><div class="loading-bar" id="loading-bar"></div></div>
             <div class="iframe-container" id="iframe-container">
@@ -168,15 +152,6 @@ async function initializeBrowser() {
     document.getElementById('home-btn-nav').onclick = () => window.location.href = '../index.html';
     document.getElementById('devtools-btn').onclick = toggleDevTools;
     document.getElementById('wisp-settings-btn').onclick = openSettings;
-    const menuBtn = document.getElementById('menu-btn');
-    const menuPanel = document.getElementById('menu-panel');
-    if (menuBtn && menuPanel) {
-        menuBtn.onclick = (event) => {
-            event.stopPropagation();
-            menuPanel.classList.toggle('hidden');
-        };
-        document.addEventListener('click', () => menuPanel.classList.add('hidden'));
-    }
 
     // Skip button logic
     const skipBtn = document.getElementById('skip-btn');
@@ -191,8 +166,10 @@ async function initializeBrowser() {
     }
 
     const addrBar = document.getElementById('address-bar');
-    addrBar.onkeyup = (e) => { if (e.key === 'Enter') handleSubmit(); };
-    addrBar.onfocus = () => addrBar.select();
+    if (addrBar) {
+        addrBar.onkeyup = (e) => { if (e.key === 'Enter') handleSubmit(); };
+        addrBar.onfocus = () => addrBar.select();
+    }
 
     window.addEventListener('message', (e) => {
         if (e.data?.type === 'navigate') handleSubmit(e.data.url);
@@ -201,6 +178,7 @@ async function initializeBrowser() {
     const newTabButton = document.getElementById('new-tab-btn');
     if (newTabButton) newTabButton.onclick = () => createTab(true);
     createTab(true);
+    applyStoredTheme();
     checkHashParameters();
 }
 
@@ -232,13 +210,19 @@ function createTab(makeActive = true) {
             showIframeLoading(true, tab.url);
         }
 
-        try {
-            const urlObj = new URL(e.url);
-            tab.title = urlObj.hostname;
-            tab.favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-        } catch {
-            tab.title = "Browsing";
+        if (e.url.includes('NT.html')) {
+            tab.title = "New Tab";
+            tab.url = "";
             tab.favicon = null;
+        } else {
+            try {
+                const urlObj = new URL(e.url);
+                tab.title = urlObj.hostname;
+                tab.favicon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+            } catch {
+                tab.title = "Browsing";
+                tab.favicon = null;
+            }
         }
         updateTabsUI();
         updateAddressBar();
@@ -388,7 +372,11 @@ function updateAddressBar() {
     const bar = document.getElementById("address-bar");
     const tab = getActiveTab();
     if (bar && tab) {
-        bar.value = (tab.url && !tab.url.includes("NT.html")) ? tab.url : "";
+        if (!tab.url || tab.url.includes("NT.html") || tab.url === `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`) {
+            bar.value = "";
+            return;
+        }
+        bar.value = tab.url;
     }
 }
 
@@ -400,6 +388,11 @@ function handleSubmit(url) {
     const bar = document.getElementById("address-bar");
     let input = url || bar?.value.trim();
     if (!input) return;
+
+    if (input.startsWith(INTERNAL_PROTOCOL)) {
+        handleInternalUrl(input, tab);
+        return;
+    }
 
     if (!input.startsWith('http')) {
         if (input.includes('.') && !input.includes(' ')) input = 'https://' + input;
@@ -431,6 +424,12 @@ function openSettings() {
     modal.onclick = (e) => {
         if (e.target === modal) modal.classList.add('hidden');
     };
+
+    modal.querySelectorAll('.theme-btn').forEach((button) => {
+        button.onclick = () => {
+            setTheme(button.dataset.theme || 'dark');
+        };
+    });
 
     renderServerList();
 }
@@ -471,39 +470,6 @@ function renderServerList() {
             check.style.color = 'var(--accent)';
             name.appendChild(check);
         }
-
-        const status = document.createElement('div');
-        status.className = 'server-status';
-
-        const ping = document.createElement('span');
-        ping.className = 'ping-text';
-        ping.textContent = '...';
-
-        const indicator = document.createElement('div');
-        indicator.className = 'status-indicator';
-
-        status.appendChild(ping);
-        status.appendChild(indicator);
-
-        if (isCustom) {
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-wisp-btn';
-            deleteButton.title = 'Remove';
-            deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
-            deleteButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                deleteCustomWisp(server.url);
-            });
-            status.appendChild(deleteButton);
-        }
-
-        header.appendChild(name);
-        header.appendChild(status);
-
-        const urlText = document.createElement('div');
-        urlText.className = 'wisp-option-url';
-        urlText.textContent = server.url;
-
         item.appendChild(header);
         item.appendChild(urlText);
         list.appendChild(item);

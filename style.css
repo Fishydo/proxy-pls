@@ -69,6 +69,22 @@
     --bg-image: none;
 }
 
+[data-theme="light"] {
+    --bg: #f1f3f4;
+    --surface: #ffffff;
+    --surface-hover: #f5f7f8;
+    --surface-active: #e8eaed;
+    --border: rgba(60, 64, 67, 0.2);
+    --border-light: rgba(60, 64, 67, 0.3);
+    --text: #202124;
+    --text-muted: #5f6368;
+    --text-dim: #757b82;
+    --accent: #1a73e8;
+    --accent-dim: rgba(26, 115, 232, 0.7);
+    --accent-glow: rgba(26, 115, 232, 0.2);
+    --accent-strong: #4285f4;
+}
+
 *,
 *::before,
 *::after {
@@ -125,12 +141,6 @@ body::before {
     flex: 1;
 }
 
-.tab-strip-right {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .tabs {
     display: flex;
     gap: 6px;
@@ -147,7 +157,6 @@ body::before {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    min-width: 180px;
     max-width: 240px;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -190,12 +199,12 @@ body::before {
     cursor: pointer;
     padding: 2px;
     border-radius: 4px;
-    transition: all 0.15s;
+    transition: all var(--transition-normal);
     line-height: 1;
 }
 
 .tab-close:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-hover);
     color: var(--text);
 }
 
@@ -220,24 +229,6 @@ body::before {
     color: var(--text);
 }
 
-.window-control {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-}
-
-.window-control:hover {
-    background: var(--surface-hover);
-    color: var(--text);
-}
-
 /* Navigation Bar */
 .toolbar {
     display: flex;
@@ -247,14 +238,6 @@ body::before {
     background: var(--bg);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-}
-
-.nav-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .toolbar button,
 .nav-controls button {
     display: flex;
@@ -701,66 +684,4 @@ input.bar::placeholder {
 
 .flex {
     display: flex;
-}
-
-.bookmarks-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-}
-
-.bookmark-item {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text);
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.bookmark-item:hover {
-    background: var(--surface-hover);
-    border-color: var(--border-light);
-}
-
-.menu-panel {
-    position: absolute;
-    top: 52px;
-    right: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px;
-    min-width: 200px;
-    box-shadow: var(--shadow-lg);
-    z-index: 999;
-}
-
-.menu-panel.hidden {
-    display: none;
-}
-
-.menu-item {
-    width: 100%;
-    background: transparent;
-    border: none;
-    color: var(--text);
-    padding: 8px 10px;
-    text-align: left;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.menu-item:hover {
-    background: var(--surface-hover);
-}
-
-.menu-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 6px 0;
 }
