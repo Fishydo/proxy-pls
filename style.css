@@ -139,7 +139,6 @@ body::before {
     align-items: center;
     gap: 6px;
     flex: 1;
-    min-width: 0;
 }
 
 .tabs {
@@ -147,8 +146,6 @@ body::before {
     gap: 6px;
     overflow-x: auto;
     flex: 1;
-    --tab-size: 200px;
-    min-width: 0;
 }
 
 .tabs::-webkit-scrollbar {
@@ -160,8 +157,6 @@ body::before {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    width: var(--tab-size);
-    min-width: 120px;
     max-width: 240px;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -243,14 +238,6 @@ body::before {
     background: var(--bg);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-}
-
-.nav-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .toolbar button,
 .nav-controls button {
     display: flex;
@@ -341,14 +328,6 @@ input.bar::placeholder {
     color: var(--text);
 }
 
-.omnibox-btn:focus-visible,
-.nav-controls button:focus-visible,
-.toolbar button:focus-visible,
-.tab-action:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
 .toolbar-actions {
     display: flex;
     align-items: center;
@@ -377,7 +356,7 @@ input.bar::placeholder {
 .iframe-container {
     flex: 1;
     position: relative;
-    background: var(--bg);
+    background: #0b0d12;
 }
 
 .iframe-container iframe {
@@ -680,29 +659,6 @@ input.bar::placeholder {
 
 .custom-input-group button:hover {
     background: var(--accent-strong);
-}
-
-.theme-toggle {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.theme-btn {
-    flex: 1;
-    height: 32px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.theme-btn.active,
-.theme-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
 }
 
 .settings-footer {

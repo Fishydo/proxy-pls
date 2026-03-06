@@ -9,11 +9,6 @@ const WISP_SERVERS = [
 ];
 const SEARCH_URL = "https://search.brave.com/search?q=";
 const WISP_PROTOCOLS = new Set(["ws:", "wss:"]);
-const INTERNAL_PROTOCOL = "lcc://";
-const INTERNAL_PAGES = {
-    settings: "settings",
-    newtab: "newtab"
-};
 
 if (!localStorage.getItem("proxServer")) {
     localStorage.setItem("proxServer", DEFAULT_WISP);
@@ -114,7 +109,6 @@ async function initializeBrowser() {
                     </div>
                     <input class="bar" id="address-bar" autocomplete="off" placeholder="Search Google or type a URL">
                     <div class="omnibox-actions">
-                        <button class="omnibox-btn" id="theme-toggle" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
                     </div>
                 </div>
                 <div class="toolbar-actions">
@@ -139,6 +133,17 @@ async function initializeBrowser() {
                     </div>
                 </div>
             </div>
+            <div class="menu-panel hidden" id="menu-panel">
+                <button class="menu-item">New Tab</button>
+                <button class="menu-item">New Window</button>
+                <button class="menu-item">New Incognito Window</button>
+                <div class="menu-divider"></div>
+                <button class="menu-item">History</button>
+                <button class="menu-item">Downloads</button>
+                <button class="menu-item">Bookmarks</button>
+                <div class="menu-divider"></div>
+                <button class="menu-item">Settings</button>
+            </div>
         </div>`;
 
     document.getElementById('back-btn').onclick = () => getActiveTab()?.frame.back();
@@ -147,8 +152,6 @@ async function initializeBrowser() {
     document.getElementById('home-btn-nav').onclick = () => window.location.href = '../index.html';
     document.getElementById('devtools-btn').onclick = toggleDevTools;
     document.getElementById('wisp-settings-btn').onclick = openSettings;
-    const themeToggle = document.getElementById('theme-toggle');
-    if (themeToggle) themeToggle.onclick = toggleTheme;
 
     // Skip button logic
     const skipBtn = document.getElementById('skip-btn');
@@ -174,7 +177,6 @@ async function initializeBrowser() {
 
     const newTabButton = document.getElementById('new-tab-btn');
     if (newTabButton) newTabButton.onclick = () => createTab(true);
-    window.addEventListener('resize', updateTabsUI);
     createTab(true);
     applyStoredTheme();
     checkHashParameters();
@@ -364,15 +366,6 @@ function updateTabsUI() {
         newBtn.onclick = () => createTab(true);
         container.appendChild(newBtn);
     }
-
-    const availableWidth = container.getBoundingClientRect().width || 0;
-    const tabCount = Math.max(tabs.length, 1);
-    const maxWidth = 220;
-    const minWidth = 120;
-    const gap = 6;
-    const targetWidth = Math.floor((availableWidth - gap * tabCount) / tabCount);
-    const tabWidth = Math.max(minWidth, Math.min(maxWidth, targetWidth));
-    container.style.setProperty('--tab-size', `${tabWidth}px`);
 }
 
 function updateAddressBar() {
@@ -477,39 +470,6 @@ function renderServerList() {
             check.style.color = 'var(--accent)';
             name.appendChild(check);
         }
-
-        const status = document.createElement('div');
-        status.className = 'server-status';
-
-        const ping = document.createElement('span');
-        ping.className = 'ping-text';
-        ping.textContent = '...';
-
-        const indicator = document.createElement('div');
-        indicator.className = 'status-indicator';
-
-        status.appendChild(ping);
-        status.appendChild(indicator);
-
-        if (isCustom) {
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-wisp-btn';
-            deleteButton.title = 'Remove';
-            deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
-            deleteButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                deleteCustomWisp(server.url);
-            });
-            status.appendChild(deleteButton);
-        }
-
-        header.appendChild(name);
-        header.appendChild(status);
-
-        const urlText = document.createElement('div');
-        urlText.className = 'wisp-option-url';
-        urlText.textContent = server.url;
-
         item.appendChild(header);
         item.appendChild(urlText);
         list.appendChild(item);
@@ -662,54 +622,4 @@ function showErrorMessage(message) {
     errorMessage.textContent = message;
     errorEl.style.display = "flex";
     showIframeLoading(false);
-}
-
-function handleInternalUrl(input, tab) {
-    const page = input.replace(INTERNAL_PROTOCOL, '').toLowerCase();
-    if (page === INTERNAL_PAGES.settings) {
-        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.settings}`;
-        tab.title = "Settings";
-        tab.favicon = null;
-        tab.loading = false;
-        openSettings();
-        updateTabsUI();
-        updateAddressBar();
-        showIframeLoading(false);
-        return;
-    }
-
-    if (page === INTERNAL_PAGES.newtab) {
-        tab.url = `${INTERNAL_PROTOCOL}${INTERNAL_PAGES.newtab}`;
-        tab.title = "New Tab";
-        tab.favicon = null;
-        tab.loading = false;
-        tab.frame.frame.src = "NT.html";
-        updateTabsUI();
-        updateAddressBar();
-        showIframeLoading(false);
-        return;
-    }
-
-    showErrorMessage("Unknown internal page.");
-}
-
-function applyStoredTheme() {
-    const theme = localStorage.getItem('theme') || 'dark';
-    setTheme(theme);
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.dataset.theme || 'dark';
-    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-}
-
-function setTheme(theme) {
-    const nextTheme = theme === 'light' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = nextTheme;
-    localStorage.setItem('theme', nextTheme);
-    const themeButtons = document.querySelectorAll('.theme-btn');
-    themeButtons.forEach((button) => {
-        button.classList.toggle('active', button.dataset.theme === nextTheme);
-    });
 }
