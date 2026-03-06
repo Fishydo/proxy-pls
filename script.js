@@ -170,6 +170,22 @@ async function initializeBrowser() {
     };
 
     document.getElementById("new-tab-btn").onclick = () => createTab(true);
+    document.getElementById("home-btn-nav").onclick = openHome;
+    document.getElementById("theme-toggle").onclick = toggleTheme;
+    document.getElementById("extensions-btn").onclick = () => {
+        const menu = document.getElementById('extensions-menu');
+        menu.classList.toggle('hidden');
+        renderExtensionsMenu();
+    };
+
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.dataset.theme = savedTheme;
+
+    window.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (data.type === 'navigate' && data.url) handleSubmit(data.url);
+        if (data.type === 'extensionsUpdated') renderExtensionsMenu();
+    });
 
     window.addEventListener("resize", updateTabsUI);
 
@@ -177,6 +193,54 @@ async function initializeBrowser() {
 
 }
 
+
+
+function showErrorMessage(message) {
+    alert(message);
+}
+
+function openHome() {
+    handleSubmit('NT.html');
+}
+
+function toggleTheme() {
+    const themes = ['dark', 'light', 'graphite', 'forest', 'sunset'];
+    const current = document.documentElement.dataset.theme || localStorage.getItem('theme') || 'dark';
+    const next = themes[(themes.indexOf(current) + 1) % themes.length] || 'dark';
+    localStorage.setItem('theme', next);
+    document.documentElement.dataset.theme = next;
+}
+
+function getExtensions() {
+    try {
+        return JSON.parse(localStorage.getItem('extensions') || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function renderExtensionsMenu() {
+    const menu = document.getElementById('extensions-menu');
+    const list = document.getElementById('extensions-list');
+    const empty = document.getElementById('extensions-empty');
+    if (!menu || !list || !empty) return;
+
+    const extensions = getExtensions();
+    list.innerHTML = '';
+
+    if (!extensions.length) {
+        empty.classList.remove('hidden');
+        return;
+    }
+
+    empty.classList.add('hidden');
+    extensions.forEach(ext => {
+        const item = document.createElement('div');
+        item.className = 'extension-item';
+        item.textContent = ext?.name || 'Unnamed extension';
+        list.appendChild(item);
+    });
+}
 
 // =====================================================
 // TAB MANAGEMENT
@@ -309,5 +373,6 @@ function handleSubmit(url){
     }
 
     tab.frame.go(input);
+    bar.value = input;
 
 }

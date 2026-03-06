@@ -235,7 +235,7 @@ height:40px;
 box-shadow:var(--shadow-sm);
 }
 
-input.bar{
+#address-bar{
 width:100%;
 border:none;
 background:transparent;
