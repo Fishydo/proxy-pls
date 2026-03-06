@@ -10,101 +10,63 @@
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
     :root {
-      --bg: #101216;
-      --surface: #1c2026;
-      --surface-hover: #232931;
-      --border: rgba(255, 255, 255, 0.08);
-      --text: #e8eaed;
-      --text-muted: #9aa0a6;
-      --accent: #8ab4f8;
-    }
-
-    [data-theme="light"] {
       --bg: #f1f3f4;
-      --surface: #ffffff;
-      --surface-hover: #f5f7f8;
+      --surface: #fff;
+      --surface-hover: #eef0f2;
       --border: rgba(60, 64, 67, 0.2);
       --text: #202124;
       --text-muted: #5f6368;
       --accent: #1a73e8;
     }
 
-    [data-theme="graphite"] {
-      --bg: #1a1c22;
-      --surface: #252932;
-      --surface-hover: #2f3440;
-      --border: rgba(255, 255, 255, 0.12);
-      --text: #eceff4;
-      --text-muted: #aab2bd;
-      --accent: #9fb0ff;
+    [data-theme="dark"] {
+      --bg: #202124;
+      --surface: #292a2d;
+      --surface-hover: #35363a;
+      --border: rgba(255, 255, 255, 0.14);
+      --text: #e8eaed;
+      --text-muted: #9aa0a6;
+      --accent: #8ab4f8;
     }
-
-    [data-theme="forest"] {
-      --bg: #101913;
-      --surface: #17241b;
-      --surface-hover: #1f3125;
-      --border: rgba(153, 201, 165, 0.16);
-      --text: #e6f2ea;
-      --text-muted: #a3bea9;
-      --accent: #7ed6a2;
-    }
-
-    [data-theme="sunset"] {
-      --bg: #1c1311;
-      --surface: #271a16;
-      --surface-hover: #32211c;
-      --border: rgba(255, 183, 138, 0.16);
-      --text: #fff0e7;
-      --text-muted: #d7b5a3;
-      --accent: #ff9e6d;
-    }
+    [data-theme="graphite"] { --bg:#1a1c22; --surface:#252932; --surface-hover:#2f3440; --border:rgba(255,255,255,.12); --text:#eceff4; --text-muted:#aab2bd; --accent:#9fb0ff; }
+    [data-theme="forest"] { --bg:#101913; --surface:#17241b; --surface-hover:#1f3125; --border:rgba(153,201,165,.16); --text:#e6f2ea; --text-muted:#a3bea9; --accent:#7ed6a2; }
+    [data-theme="sunset"] { --bg:#1c1311; --surface:#271a16; --surface-hover:#32211c; --border:rgba(255,183,138,.16); --text:#fff0e7; --text-muted:#d7b5a3; --accent:#ff9e6d; }
 
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: 'Roboto', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
+    body { margin: 0; font-family: 'Roboto', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
     .sidebar { border-right: 1px solid var(--border); background: var(--surface); padding: 24px 16px; }
     .sidebar h1 { margin: 0 0 16px; font-size: 19px; }
-    .nav-item {
-      width: 100%; border: none; background: transparent; color: var(--text);
-      text-align: left; padding: 11px 12px; border-radius: 10px; margin-bottom: 6px;
-      cursor: pointer; font-size: 14px;
-    }
+    .nav-item { width: 100%; border: none; background: transparent; color: var(--text); text-align: left; padding: 11px 12px; border-radius: 999px; margin-bottom: 6px; cursor: pointer; font-size: 14px; }
     .nav-item.active,.nav-item:hover { background: var(--surface-hover); }
 
     .content { padding: 28px 34px; }
     .page { display: none; }
     .page.active { display: block; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 16px; }
     .card h2 { margin: 0 0 8px; font-size: 18px; }
     .desc { margin: 0 0 14px; color: var(--text-muted); font-size: 13px; }
 
     .themes { display: grid; grid-template-columns: repeat(3,minmax(120px,1fr)); gap: 10px; }
-    .theme-btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 10px; height: 36px; cursor: pointer; }
+    .theme-btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 999px; height: 36px; cursor: pointer; }
     .theme-btn.active,.theme-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-    .server-item, .extension-item {
-      border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 10px;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    }
+    .server-item, .extension-item { border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .server-item.active { border-color: var(--accent); }
     .muted { color: var(--text-muted); font-size: 12px; }
+    .server-meta { display: flex; flex-direction: column; gap: 2px; }
+    .ping { font-size: 12px; }
+    .ping.good { color: #16a34a; }
+    .ping.bad { color: #dc2626; }
 
     .row { display: flex; gap: 10px; }
-    input, textarea {
-      width: 100%; background: transparent; color: var(--text); border: 1px solid var(--border);
-      border-radius: 8px; padding: 8px 10px; font-family: inherit;
-    }
+    input, textarea { width: 100%; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-family: inherit; }
     textarea { min-height: 130px; resize: vertical; }
 
-    .btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+    .btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 999px; padding: 8px 12px; cursor: pointer; }
     .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn:disabled { opacity: .6; cursor: wait; }
     .rules { display: flex; flex-direction: column; gap: 6px; }
     .rule { font-size: 12px; color: var(--text-muted); }
   </style>
@@ -113,7 +75,7 @@
 <body>
   <div class="shell">
     <aside class="sidebar">
-      <h1>Settings</h1>
+      <h1><i class="fa-solid fa-gear"></i> Settings</h1>
       <button class="nav-item active" data-page="appearance">Appearance</button>
       <button class="nav-item" data-page="proxy">Proxy</button>
       <button class="nav-item" data-page="extensions">Extensions</button>
@@ -130,7 +92,7 @@
       <section class="page" id="page-proxy">
         <div class="card">
           <h2>Proxy servers</h2>
-          <p class="desc">Select a Wisp server. Changes apply immediately.</p>
+          <p class="desc">Select a Wisp server, and test ping for each <code>wss://</code> endpoint.</p>
           <div id="servers"></div>
           <div class="row">
             <input id="customWisp" placeholder="wss://your-wisp-server.com/wisp/">
@@ -147,13 +109,9 @@
         </div>
         <div class="card">
           <h2>Add extension</h2>
-          <div class="row" style="margin-bottom:10px;">
-            <input id="extName" placeholder="Extension name">
-          </div>
+          <div class="row" style="margin-bottom:10px;"><input id="extName" placeholder="Extension name"></div>
           <textarea id="extCode" placeholder="// JavaScript to run in page context"></textarea>
-          <div class="row" style="margin-top:10px;">
-            <button class="btn primary" id="saveExt">Save extension</button>
-          </div>
+          <div class="row" style="margin-top:10px;"><button class="btn primary" id="saveExt">Save extension</button></div>
         </div>
       </section>
     </main>
@@ -168,6 +126,7 @@
     ];
     const WISP_PROTOCOLS = new Set(['ws:', 'wss:']);
     const EXTENSIONS_KEY = 'customExtensions';
+    const pingResults = new Map();
 
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -215,6 +174,37 @@
       setTheme(current);
     }
 
+    function pingLabel(status) {
+      if (!status) return 'Ping: not tested';
+      if (status.error) return `Ping: failed (${status.error})`;
+      return `Ping: ${status.ms}ms`;
+    }
+
+    async function pingWisp(url) {
+      pingResults.set(url, { loading: true });
+      renderServers();
+      const start = performance.now();
+      const timeout = 3500;
+      return new Promise((resolve) => {
+        let done = false;
+        const ws = new WebSocket(url);
+        const timer = setTimeout(() => finish({ error: 'timeout' }), timeout);
+
+        function finish(result) {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          try { ws.close(); } catch {}
+          pingResults.set(url, result);
+          renderServers();
+          resolve(result);
+        }
+
+        ws.onopen = () => finish({ ms: Math.round(performance.now() - start) });
+        ws.onerror = () => finish({ error: 'unreachable' });
+      });
+    }
+
     function renderServers() {
       const current = localStorage.getItem('proxServer') || WISP_SERVERS[0].url;
       const all = [...WISP_SERVERS, ...getStoredWisps()];
@@ -223,8 +213,18 @@
       all.forEach((server, i) => {
         const row = document.createElement('div');
         row.className = `server-item ${server.url === current ? 'active' : ''}`;
-        row.innerHTML = `<div><div>${server.name}</div><div class="muted">${server.url}</div></div>`;
+
+        const ping = pingResults.get(server.url);
+        row.innerHTML = `<div class="server-meta"><div>${server.name}</div><div class="muted">${server.url}</div><div class="ping ${ping?.error ? 'bad' : 'good'}">${pingLabel(ping)}</div></div>`;
+
         const actions = document.createElement('div');
+        const test = document.createElement('button');
+        test.className = 'btn';
+        test.textContent = ping?.loading ? 'Testing...' : 'Test';
+        test.disabled = Boolean(ping?.loading);
+        test.onclick = () => pingWisp(server.url);
+        actions.appendChild(test);
+
         const use = document.createElement('button');
         use.className = 'btn';
         use.textContent = 'Use';
@@ -234,6 +234,7 @@
           renderServers();
         };
         actions.appendChild(use);
+
         if (i >= WISP_SERVERS.length) {
           const del = document.createElement('button');
           del.className = 'btn';
@@ -241,6 +242,7 @@
           del.onclick = () => {
             const updated = getStoredWisps().filter(w => w.url !== server.url);
             localStorage.setItem('customWisps', JSON.stringify(updated));
+            pingResults.delete(server.url);
             renderServers();
           };
           actions.appendChild(del);
@@ -286,6 +288,7 @@
       localStorage.setItem('customWisps', JSON.stringify(custom));
       $('#customWisp').value = '';
       renderServers();
+      pingWisp(normalized);
     };
 
     $('#saveExt').onclick = () => {
