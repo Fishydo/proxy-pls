@@ -311,6 +311,10 @@ function updateAddressFromFrame(tab) {
         const frameUrl = tab.frame.frame.contentWindow.location.href;
         if (frameUrl) {
             tab.currentUrl = frameUrl;
+            // Cache the decoded hostname so getActiveSiteKey() works even when
+            // the menu is closed and the frame URL is no longer readable.
+            const resolved = getSiteKeyFromUrl(frameUrl);
+            if (resolved) tab.siteKey = resolved;
             if (tab.id === activeTabId) {
                 document.getElementById("address-bar").value = frameUrl;
             }
@@ -340,7 +344,9 @@ function runAutorunExtensions(currentUrl) {
 function getActiveSiteKey() {
     const tab = getActiveTab();
     if (!tab) return "";
-    return getSiteKeyFromUrl(tab.currentUrl || tab.url);
+    // Use the cached key (set on every load event) so the value is correct
+    // whether the extensions menu is open or closed.
+    return tab.siteKey || getSiteKeyFromUrl(tab.currentUrl || tab.url);
 }
 
 function getSiteKeyFromUrl(rawUrl) {
@@ -419,6 +425,7 @@ function createTab(makeActive = true) {
         title: "New Tab",
         url: "",
         currentUrl: "",
+        siteKey: "",      // decoded hostname, cached on every navigation
         frame,
         loading: false,
         favicon: null,
