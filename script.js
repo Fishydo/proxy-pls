@@ -208,6 +208,7 @@ function renderExtensionsMenu() {
     if (!menu || !list || !empty) return;
 
     const extensions = getExtensions();
+    const activeSite = getActiveSiteKey();
     list.innerHTML = "";
 
     if (!extensions.length) {
@@ -228,21 +229,37 @@ function renderExtensionsMenu() {
         autorunLabel.className = "extension-autorun-toggle";
         const autoToggle = document.createElement("input");
         autoToggle.type = "checkbox";
-        autoToggle.checked = Boolean(ext?.autorunOnVisit);
-        autoToggle.onchange = () => setAutorunState(ext.id, autoToggle.checked);
-        autorunLabel.append(autoToggle, document.createTextNode("Autorun on site visit"));
+        autoToggle.disabled = !activeSite;
+        autoToggle.checked = isSiteEnabled(ext, activeSite);
+        autoToggle.onchange = () => {
+            if (!activeSite) return;
+            setAutorunState(ext.id, activeSite, autoToggle.checked);
+        };
+        autorunLabel.append(
+            autoToggle,
+            document.createTextNode(activeSite ? `Autorun on ${activeSite} (all directories)` : "Open a site tab to enable autorun")
+        );
 
         item.append(runBtn, autorunLabel);
         list.appendChild(item);
     });
 }
 
-function setAutorunState(extensionId, shouldAutorun) {
+function setAutorunState(extensionId, siteKey, shouldAutorun) {
     const extensions = getExtensions().map((ext) => {
         if (ext.id !== extensionId) return ext;
-        return { ...ext, autorunOnVisit: shouldAutorun };
+        const sites = { ...(ext.autorunSites || {}) };
+        if (!siteKey) return ext;
+        if (shouldAutorun) sites[siteKey] = true;
+        else delete sites[siteKey];
+        return { ...ext, autorunSites: sites };
     });
     localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
+}
+
+function isSiteEnabled(extension, siteKey) {
+    if (!siteKey) return false;
+    return Boolean(extension?.autorunSites?.[siteKey]);
 }
 
 function runExtension(extension) {
@@ -268,6 +285,7 @@ function updateAddressFromFrame(tab) {
                 document.getElementById("address-bar").value = frameUrl;
             }
             runAutorunExtensions(frameUrl);
+            if (tab.id === activeTabId && extensionsVisible) renderExtensionsMenu();
             return;
         }
     } catch {
@@ -281,9 +299,56 @@ function updateAddressFromFrame(tab) {
 
 function runAutorunExtensions(currentUrl) {
     if (!currentUrl) return;
+    const siteKey = getSiteKeyFromUrl(currentUrl);
+    if (!siteKey) return;
+
     getExtensions()
-        .filter((ext) => Boolean(ext.autorunOnVisit))
+        .filter((ext) => isSiteEnabled(ext, siteKey))
         .forEach((ext) => runExtension(ext));
+}
+
+function getActiveSiteKey() {
+    const tab = getActiveTab();
+    if (!tab) return "";
+    return getSiteKeyFromUrl(tab.currentUrl || tab.url);
+}
+
+function getSiteKeyFromUrl(rawUrl) {
+    const targetUrl = extractTargetUrl(rawUrl);
+    if (!targetUrl) return "";
+
+    try {
+        return new URL(targetUrl).host.toLowerCase();
+    } catch {
+        return "";
+    }
+}
+
+function extractTargetUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== "string") return "";
+
+    const trimmed = rawUrl.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+    const decoded = safeDecode(trimmed);
+    if (/^https?:\/\//i.test(decoded)) return decoded;
+
+    const encodedMatch = trimmed.match(/https?%3A%2F%2F[^\s&#]+/i);
+    if (encodedMatch) {
+        const candidate = safeDecode(encodedMatch[0]);
+        if (/^https?:\/\//i.test(candidate)) return candidate;
+    }
+
+    const directMatch = trimmed.match(/https?:\/\/[^")\s'<>]+/i);
+    return directMatch ? directMatch[0] : "";
+}
+
+function safeDecode(value) {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
 }
 
 // =====================================================
@@ -327,6 +392,7 @@ function switchTab(id) {
     if (active) {
         document.getElementById("address-bar").value = active.currentUrl || active.url || "";
     }
+    if (extensionsVisible) renderExtensionsMenu();
     updateTabsUI();
 }
 
