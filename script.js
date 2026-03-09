@@ -304,6 +304,14 @@ function runExtension(extension) {
     }
 }
 
+// Returns the user-friendly URL for the address bar.
+// If it's a scramjet proxy URL, shows only the decoded destination.
+function getDisplayUrl(rawUrl) {
+    if (!rawUrl) return rawUrl;
+    const decoded = extractTargetUrl(rawUrl);
+    return decoded || rawUrl;
+}
+
 function updateAddressFromFrame(tab) {
     if (!tab) return;
 
@@ -316,7 +324,7 @@ function updateAddressFromFrame(tab) {
             const resolved = getSiteKeyFromUrl(frameUrl);
             if (resolved) tab.siteKey = resolved;
             if (tab.id === activeTabId) {
-                document.getElementById("address-bar").value = frameUrl;
+                document.getElementById("address-bar").value = getDisplayUrl(frameUrl);
             }
             runAutorunExtensions(frameUrl);
             if (tab.id === activeTabId && extensionsVisible) renderExtensionsMenu();
@@ -327,7 +335,7 @@ function updateAddressFromFrame(tab) {
     }
 
     if (tab.id === activeTabId && tab.url) {
-        document.getElementById("address-bar").value = tab.url;
+        document.getElementById("address-bar").value = getDisplayUrl(tab.url);
     }
 }
 
@@ -441,7 +449,7 @@ function createTab(makeActive = true) {
         updateTabsUI();
     });
 
-    // Poll for URL changes so autorun fires immediately on every navigation,
+    // Poll for URL changes every 5s so autorun fires on every navigation,
     // including SPA soft-navigations that don't trigger a new load event.
     let _lastPolledUrl = "";
     setInterval(() => {
@@ -454,11 +462,14 @@ function createTab(makeActive = true) {
                     tab.siteKey = key;
                     tab.currentUrl = href;
                 }
+                if (tab.id === activeTabId) {
+                    document.getElementById("address-bar").value = getDisplayUrl(href);
+                }
                 runAutorunExtensions(href);
                 if (tab.id === activeTabId && extensionsVisible) renderExtensionsMenu();
             }
         } catch { /* cross-origin frame, skip */ }
-    }, 500);
+    }, 5000);
 
     tabs.push(tab);
     document.getElementById("iframe-container").appendChild(frame.frame);
@@ -471,7 +482,7 @@ function switchTab(id) {
     tabs.forEach((t) => t.frame.frame.classList.toggle("hidden", t.id !== id));
     const active = getActiveTab();
     if (active) {
-        document.getElementById("address-bar").value = active.currentUrl || active.url || "";
+        document.getElementById("address-bar").value = getDisplayUrl(active.currentUrl || active.url || "");
     }
     if (extensionsVisible) renderExtensionsMenu();
     updateTabsUI();
