@@ -28,6 +28,7 @@ let connection;
 let tabs = [];
 let activeTabId = null;
 let nextTabId = 1;
+let extensionsVisible = false;
 
 // =====================================================
 // INITIALIZATION
@@ -106,7 +107,7 @@ async function initializeBrowser() {
       <div class="omnibox-actions">
         <button id="extensions-btn" title="Extensions"><i class="fa-solid fa-puzzle-piece"></i></button>
         <button id="settings-btn" title="Settings"><i class="fa-solid fa-gear"></i></button>
-        <button id="theme-toggle" title="Toggle theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
+        <button id="devtools-btn" title="Developer tools"><i class="fa-solid fa-code"></i></button>
       </div>
     </div>
   </div>
@@ -126,11 +127,12 @@ async function initializeBrowser() {
     document.getElementById("reload-btn").onclick = () => getActiveTab()?.frame.reload();
     document.getElementById("new-tab-btn").onclick = () => createTab(true);
     document.getElementById("home-btn-nav").onclick = openHome;
-    document.getElementById("theme-toggle").onclick = toggleTheme;
+    document.getElementById("devtools-btn").onclick = openDevTools;
     document.getElementById("settings-btn").onclick = openSettings;
     document.getElementById("extensions-btn").onclick = () => {
         const menu = document.getElementById("extensions-menu");
-        menu.classList.toggle("hidden");
+        extensionsVisible = !extensionsVisible;
+        menu.classList.toggle("hidden", !extensionsVisible);
         renderExtensionsMenu();
     };
 
@@ -177,12 +179,18 @@ function openSettings() {
     document.getElementById("address-bar").value = "settings.html";
 }
 
-function toggleTheme() {
-    const themes = ["dark", "light", "graphite", "forest", "sunset"];
-    const current = document.documentElement.dataset.theme || localStorage.getItem("theme") || "dark";
-    const next = themes[(themes.indexOf(current) + 1) % themes.length] || "dark";
-    localStorage.setItem("theme", next);
-    document.documentElement.dataset.theme = next;
+function openDevTools() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    const target = tab.currentUrl || tab.url;
+    if (!target || target.endsWith("NT.html")) {
+        alert("Open a page first, then use developer tools.");
+        return;
+    }
+
+    const devToolsUrl = `view-source:${target}`;
+    window.open(devToolsUrl, "_blank", "noopener,noreferrer");
 }
 
 function getExtensions() {
@@ -211,9 +219,71 @@ function renderExtensionsMenu() {
     extensions.forEach((ext) => {
         const item = document.createElement("div");
         item.className = "extension-item";
-        item.textContent = ext?.name || "Unnamed extension";
+        const runBtn = document.createElement("button");
+        runBtn.className = "extension-run-btn";
+        runBtn.textContent = ext?.name || "Unnamed extension";
+        runBtn.onclick = () => runExtension(ext);
+
+        const autorunLabel = document.createElement("label");
+        autorunLabel.className = "extension-autorun-toggle";
+        const autoToggle = document.createElement("input");
+        autoToggle.type = "checkbox";
+        autoToggle.checked = Boolean(ext?.autorunOnVisit);
+        autoToggle.onchange = () => setAutorunState(ext.id, autoToggle.checked);
+        autorunLabel.append(autoToggle, document.createTextNode("Autorun on site visit"));
+
+        item.append(runBtn, autorunLabel);
         list.appendChild(item);
     });
+}
+
+function setAutorunState(extensionId, shouldAutorun) {
+    const extensions = getExtensions().map((ext) => {
+        if (ext.id !== extensionId) return ext;
+        return { ...ext, autorunOnVisit: shouldAutorun };
+    });
+    localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
+}
+
+function runExtension(extension) {
+    const tab = getActiveTab();
+    const frameWindow = tab?.frame?.frame?.contentWindow;
+    if (!frameWindow || !extension?.code?.trim()) return;
+
+    try {
+        frameWindow.eval(extension.code);
+    } catch (error) {
+        console.warn(`Failed to run extension \"${extension.name}\":`, error);
+    }
+}
+
+function updateAddressFromFrame(tab) {
+    if (!tab) return;
+
+    try {
+        const frameUrl = tab.frame.frame.contentWindow.location.href;
+        if (frameUrl) {
+            tab.currentUrl = frameUrl;
+            if (tab.id === activeTabId) {
+                document.getElementById("address-bar").value = frameUrl;
+            }
+            runAutorunExtensions(frameUrl);
+            return;
+        }
+    } catch {
+        // Fallback to last known URL when frame location is inaccessible.
+    }
+
+    if (tab.id === activeTabId && tab.url) {
+        document.getElementById("address-bar").value = tab.url;
+    }
+}
+
+function runAutorunExtensions(currentUrl) {
+    if (!currentUrl) return;
+    getExtensions()
+        .filter((ext) => Boolean(ext.autorunOnVisit))
+        .forEach((ext) => runExtension(ext));
 }
 
 // =====================================================
@@ -226,6 +296,7 @@ function createTab(makeActive = true) {
         id: nextTabId++,
         title: "New Tab",
         url: "",
+        currentUrl: "",
         frame,
         loading: false,
         favicon: null,
@@ -239,6 +310,7 @@ function createTab(makeActive = true) {
             const title = frame.frame.contentWindow.document.title;
             if (title) tab.title = title;
         } catch {}
+        updateAddressFromFrame(tab);
         updateTabsUI();
     });
 
@@ -251,6 +323,10 @@ function createTab(makeActive = true) {
 function switchTab(id) {
     activeTabId = id;
     tabs.forEach((t) => t.frame.frame.classList.toggle("hidden", t.id !== id));
+    const active = getActiveTab();
+    if (active) {
+        document.getElementById("address-bar").value = active.currentUrl || active.url || "";
+    }
     updateTabsUI();
 }
 
@@ -302,6 +378,9 @@ function handleSubmit(url) {
         else input = SEARCH_URL + encodeURIComponent(input);
     }
 
+    tab.url = input;
+    tab.currentUrl = input;
     tab.frame.go(input);
     bar.value = input;
+    runAutorunExtensions(input);
 }
