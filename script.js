@@ -266,7 +266,7 @@ function renderExtensionsMenu() {
         };
         autorunLabel.append(
             autoToggle,
-            document.createTextNode(activeSite ? `Autorun on ${activeSite} (all directories)` : "Open a site tab to enable autorun")
+            document.createTextNode(activeSite ? `Autorun (beta) on ${activeSite} (all directories)` : "Open a site tab to enable autorun")
         );
 
         item.append(runBtn, autorunLabel);
