@@ -307,7 +307,9 @@ function runExtension(extension) {
 // Returns the user-friendly URL for the address bar.
 // If it's a scramjet proxy URL, shows only the decoded destination.
 function getDisplayUrl(rawUrl) {
-    if (!rawUrl) return rawUrl;
+    if (!rawUrl) return "";
+    // Local pages (new tab, settings) show placeholder instead of internal URL
+    if (/\/(NT|settings)(\.html)?(\?.*)?$/i.test(rawUrl)) return "";
     const decoded = extractTargetUrl(rawUrl);
     return decoded || rawUrl;
 }
