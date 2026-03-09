@@ -270,7 +270,7 @@ function runExtension(extension) {
     try {
         frameWindow.eval(extension.code);
     } catch (error) {
-        console.warn(`Failed to run extension \"${extension.name}\":`, error);
+        console.warn(`Failed to run extension "${extension.name}":`, error);
     }
 }
 
@@ -328,17 +328,44 @@ function extractTargetUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== "string") return "";
 
     const trimmed = rawUrl.trim();
+
+    // ── Scramjet proxy URLs ──────────────────────────────────────────────────
+    // The frame's href looks like:  https://host/scramjet/<encoded-destination>
+    // Everything after /scramjet/ is the proxied URL (plain or percent-encoded).
+    const scramjetMatch = trimmed.match(/\/scramjet\/(.+)$/i);
+    if (scramjetMatch) {
+        const afterPrefix = scramjetMatch[1];
+
+        // Already a plain URL after the prefix
+        if (/^https?:\/\//i.test(afterPrefix)) return afterPrefix;
+
+        // Percent-encoded URL (https%3A%2F%2F...)
+        const encodedMatch = afterPrefix.match(/^(https?%3A%2F%2F[^\s&#]*)/i);
+        if (encodedMatch) {
+            const candidate = safeDecode(encodedMatch[1]);
+            if (/^https?:\/\//i.test(candidate)) return candidate;
+        }
+
+        // Try decoding the whole segment as a fallback
+        const decoded = safeDecode(afterPrefix);
+        if (/^https?:\/\//i.test(decoded)) return decoded;
+    }
+
+    // ── Plain passthrough URL ────────────────────────────────────────────────
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
+    // ── Fully decoded URL ────────────────────────────────────────────────────
     const decoded = safeDecode(trimmed);
     if (/^https?:\/\//i.test(decoded)) return decoded;
 
+    // ── Inline percent-encoded URL anywhere in the string ────────────────────
     const encodedMatch = trimmed.match(/https?%3A%2F%2F[^\s&#]+/i);
     if (encodedMatch) {
         const candidate = safeDecode(encodedMatch[0]);
         if (/^https?:\/\//i.test(candidate)) return candidate;
     }
 
+    // ── Inline plain URL anywhere in the string ──────────────────────────────
     const directMatch = trimmed.match(/https?:\/\/[^")\s'<>]+/i);
     return directMatch ? directMatch[0] : "";
 }
