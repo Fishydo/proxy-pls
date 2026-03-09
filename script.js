@@ -9,6 +9,7 @@ const WISP_SERVERS = [
 ];
 const SEARCH_URL = "https://search.brave.com/search?q=";
 const EXTENSIONS_KEY = "customExtensions";
+const AUTORUN_KEY   = "autorunSites";   // { "extensionId|||github.com": true }
 
 if (!localStorage.getItem("proxServer")) {
     localStorage.setItem("proxServer", DEFAULT_WISP);
@@ -193,12 +194,40 @@ function openDevTools() {
     window.open(devToolsUrl, "_blank", "noopener,noreferrer");
 }
 
+// =====================================================
+// EXTENSION STORAGE  (localStorage: "customExtensions")
+// =====================================================
 function getExtensions() {
     try {
         return JSON.parse(localStorage.getItem(EXTENSIONS_KEY) || "[]");
     } catch {
         return [];
     }
+}
+
+function saveExtensions(extensions) {
+    localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
+}
+
+// =====================================================
+// AUTORUN STORAGE  (localStorage: "autorunSites")
+// Shape: { "extensionId|||github.com": true, ... }
+// The site key is always the decoded hostname, e.g. "github.com"
+// =====================================================
+function getAutorunMap() {
+    try {
+        return JSON.parse(localStorage.getItem(AUTORUN_KEY) || "{}");
+    } catch {
+        return {};
+    }
+}
+
+function saveAutorunMap(map) {
+    localStorage.setItem(AUTORUN_KEY, JSON.stringify(map));
+}
+
+function autorunStorageKey(extensionId, siteKey) {
+    return extensionId + "|||" + siteKey;
 }
 
 function renderExtensionsMenu() {
@@ -246,20 +275,21 @@ function renderExtensionsMenu() {
 }
 
 function setAutorunState(extensionId, siteKey, shouldAutorun) {
-    const extensions = getExtensions().map((ext) => {
-        if (ext.id !== extensionId) return ext;
-        const sites = { ...(ext.autorunSites || {}) };
-        if (!siteKey) return ext;
-        if (shouldAutorun) sites[siteKey] = true;
-        else delete sites[siteKey];
-        return { ...ext, autorunSites: sites };
-    });
-    localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(extensions));
+    if (!siteKey) return;
+    // Save to dedicated autorunSites map in localStorage
+    const map = getAutorunMap();
+    const key = autorunStorageKey(extensionId, siteKey);
+    if (shouldAutorun) {
+        map[key] = true;
+    } else {
+        delete map[key];
+    }
+    saveAutorunMap(map);
 }
 
 function isSiteEnabled(extension, siteKey) {
-    if (!siteKey) return false;
-    return Boolean(extension?.autorunSites?.[siteKey]);
+    if (!siteKey || !extension?.id) return false;
+    return Boolean(getAutorunMap()[autorunStorageKey(extension.id, siteKey)]);
 }
 
 function runExtension(extension) {
