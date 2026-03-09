@@ -365,45 +365,43 @@ function extractTargetUrl(rawUrl) {
 
     const trimmed = rawUrl.trim();
 
-    // ── Scramjet proxy URLs ──────────────────────────────────────────────────
-    // The frame's href looks like:  https://host/scramjet/<encoded-destination>
-    // Everything after /scramjet/ is the proxied URL (plain or percent-encoded).
+    // ── Scramjet proxy URLs (always check first) ─────────────────────────────
+    // href looks like: https://proxyhost/scramjet/<encoded-or-plain-destination>
+    // We ONLY want the destination — never return the proxy host.
     const scramjetMatch = trimmed.match(/\/scramjet\/(.+)$/i);
     if (scramjetMatch) {
         const afterPrefix = scramjetMatch[1];
 
-        // Already a plain URL after the prefix
+        // Plain URL directly after prefix
         if (/^https?:\/\//i.test(afterPrefix)) return afterPrefix;
 
-        // Percent-encoded URL (https%3A%2F%2F...)
-        const encodedMatch = afterPrefix.match(/^(https?%3A%2F%2F[^\s&#]*)/i);
-        if (encodedMatch) {
-            const candidate = safeDecode(encodedMatch[1]);
+        // Percent-encoded: https%3A%2F%2F...
+        const encMatch = afterPrefix.match(/^(https?%3A%2F%2F[^\s&#]*)/i);
+        if (encMatch) {
+            const candidate = safeDecode(encMatch[1]);
             if (/^https?:\/\//i.test(candidate)) return candidate;
         }
 
-        // Try decoding the whole segment as a fallback
+        // Decode the whole segment as last resort
         const decoded = safeDecode(afterPrefix);
         if (/^https?:\/\//i.test(decoded)) return decoded;
+
+        // Could not resolve — return empty so we never fall through to the
+        // proxy host itself.
+        return "";
     }
 
-    // ── Plain passthrough URL ────────────────────────────────────────────────
+    // ── Non-proxy plain URL ───────────────────────────────────────────────────
     if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
-    // ── Fully decoded URL ────────────────────────────────────────────────────
-    const decoded = safeDecode(trimmed);
-    if (/^https?:\/\//i.test(decoded)) return decoded;
-
-    // ── Inline percent-encoded URL anywhere in the string ────────────────────
-    const encodedMatch = trimmed.match(/https?%3A%2F%2F[^\s&#]+/i);
-    if (encodedMatch) {
-        const candidate = safeDecode(encodedMatch[0]);
+    // ── Percent-encoded standalone URL ───────────────────────────────────────
+    const encStandalone = trimmed.match(/^(https?%3A%2F%2F[^\s&#]*)/i);
+    if (encStandalone) {
+        const candidate = safeDecode(encStandalone[1]);
         if (/^https?:\/\//i.test(candidate)) return candidate;
     }
 
-    // ── Inline plain URL anywhere in the string ──────────────────────────────
-    const directMatch = trimmed.match(/https?:\/\/[^")\s'<>]+/i);
-    return directMatch ? directMatch[0] : "";
+    return "";
 }
 
 function safeDecode(value) {
@@ -442,6 +440,25 @@ function createTab(makeActive = true) {
         updateAddressFromFrame(tab);
         updateTabsUI();
     });
+
+    // Poll for URL changes so autorun fires immediately on every navigation,
+    // including SPA soft-navigations that don't trigger a new load event.
+    let _lastPolledUrl = "";
+    setInterval(() => {
+        try {
+            const href = frame.frame.contentWindow.location.href;
+            if (href && href !== _lastPolledUrl) {
+                _lastPolledUrl = href;
+                const key = getSiteKeyFromUrl(href);
+                if (key) {
+                    tab.siteKey = key;
+                    tab.currentUrl = href;
+                }
+                runAutorunExtensions(href);
+                if (tab.id === activeTabId && extensionsVisible) renderExtensionsMenu();
+            }
+        } catch { /* cross-origin frame, skip */ }
+    }, 500);
 
     tabs.push(tab);
     document.getElementById("iframe-container").appendChild(frame.frame);
