@@ -50,22 +50,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
         await scramjet.init();
-
-        if ("serviceWorker" in navigator) {
-            const reg = await navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath });
-            await navigator.serviceWorker.ready;
-            reg.update();
-
-            connection = new BareMux.BareMuxConnection(`${basePath}bareworker.js`);
-            await applyTransport();
-        }
-
         await initializeBrowser();
+        setupTransport(basePath).catch((error) => {
+            console.error("Failed to initialize proxy transport:", error);
+            showErrorMessage("Proxy transport failed to initialize. Reload or change Wisp.");
+        });
     } catch (error) {
         console.error("Failed to initialize proxy UI:", error);
         showErrorMessage("Failed to initialize proxy. Reload or change Wisp.");
     }
 });
+
+async function setupTransport(basePath) {
+    if (!("serviceWorker" in navigator)) return;
+
+    const reg = await navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath });
+    reg.update();
+
+    connection = new BareMux.BareMuxConnection(`${basePath}bareworker.js`);
+    await applyTransport();
+}
 
 async function applyTransport() {
     if (!connection) return;
