@@ -113,6 +113,17 @@
           <textarea id="extCode" placeholder="// JavaScript to run in page context"></textarea>
           <div class="row" style="margin-top:10px;"><button class="btn primary" id="saveExt">Save extension</button></div>
         </div>
+        <div class="card">
+          <h2>Import user script</h2>
+          <p class="desc">Paste JavaScript (including <code>.user.js</code> scripts) or load it from a file.</p>
+          <div class="row" style="margin-bottom:10px;"><input id="importName" placeholder="Optional name (auto-detected for user scripts)"></div>
+          <textarea id="importCode" placeholder="// Paste JavaScript or a full userscript here"></textarea>
+          <div class="row" style="margin-top:10px; align-items:center;">
+            <input id="importFile" type="file" accept=".js,.user.js,text/javascript,application/javascript">
+            <button class="btn" id="loadImportFile">Load file</button>
+            <button class="btn primary" id="saveImportedScript">Save script</button>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -149,6 +160,22 @@
     function setStoredExtensions(exts) {
       localStorage.setItem(EXTENSIONS_KEY, JSON.stringify(exts));
       window.parent?.postMessage({ type: 'extensionsUpdated' }, '*');
+    }
+
+    function extractUserscriptName(code) {
+      const match = code.match(/^\s*\/\/\s*@name\s+(.+)$/mi);
+      return match ? match[1].trim() : '';
+    }
+
+    function createExtension(name, code) {
+      const resolvedCode = code || '';
+      if (!resolvedCode.trim()) return false;
+      const resolvedName = name.trim() || extractUserscriptName(resolvedCode) || `Script ${new Date().toLocaleString()}`;
+      const exts = getStoredExtensions();
+      exts.push({ id: crypto.randomUUID(), name: resolvedName, code: resolvedCode, rules: [] });
+      setStoredExtensions(exts);
+      renderExtensions();
+      return true;
     }
 
     function setTheme(theme) {
@@ -294,13 +321,30 @@
     $('#saveExt').onclick = () => {
       const name = $('#extName').value.trim();
       const code = $('#extCode').value;
-      if (!name || !code.trim()) return;
-      const exts = getStoredExtensions();
-      exts.push({ id: crypto.randomUUID(), name, code, rules: [] });
-      setStoredExtensions(exts);
+      if (!name || !createExtension(name, code)) return;
       $('#extName').value = '';
       $('#extCode').value = '';
-      renderExtensions();
+    };
+
+    $('#loadImportFile').onclick = async () => {
+      const file = $('#importFile').files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      $('#importCode').value = text;
+      if (!$('#importName').value.trim()) {
+        const detected = extractUserscriptName(text);
+        const fallback = file.name.replace(/\.user\.js$/i, '').replace(/\.js$/i, '');
+        $('#importName').value = detected || fallback;
+      }
+    };
+
+    $('#saveImportedScript').onclick = () => {
+      const name = $('#importName').value;
+      const code = $('#importCode').value;
+      if (!createExtension(name, code)) return;
+      $('#importName').value = '';
+      $('#importCode').value = '';
+      $('#importFile').value = '';
     };
 
     $$('.nav-item').forEach((btn) => {
