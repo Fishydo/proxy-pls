@@ -67,8 +67,19 @@ async function setupTransport(basePath) {
     const reg = await navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath });
     reg.update();
 
+    // Keep the service worker in sync with the selected Wisp server so
+    // proxied page fetches and websocket upgrades use the same transport.
+    postWispConfigToServiceWorker(reg);
+
     connection = new BareMux.BareMuxConnection(`${basePath}bareworker.js`);
     await applyTransport();
+}
+
+function postWispConfigToServiceWorker(registration) {
+    const configMessage = { type: "config", wispurl: wispUrl, wispCandidates: WISP_SERVERS.map((server) => server.url) };
+    const target = registration?.active || registration?.waiting || registration?.installing;
+    target?.postMessage(configMessage);
+    navigator.serviceWorker.controller?.postMessage(configMessage);
 }
 
 async function applyTransport() {
@@ -160,6 +171,7 @@ async function initializeBrowser() {
         if (data.type === "setWisp" && data.url) {
             wispUrl = data.url;
             localStorage.setItem("proxServer", data.url);
+            postWispConfigToServiceWorker(await navigator.serviceWorker.getRegistration());
             await applyTransport();
         }
     });
